@@ -101,7 +101,7 @@ hashsmith/
 │   ├── handoff-template.md
 │   ├── verification-report.md
 │   └── feedback-template.md
-├── .mcp.json                   hashops, sonarqube, sentry
+├── .mcp.json                   hashops only (SonarQube, Sentry: the developer's own)
 ├── evals/                      golden scenarios (§13)
 ├── .claude/skills/             maintainer-only, not shipped: release
 ├── CLAUDE.md                   how to work on Hashsmith itself
@@ -115,11 +115,11 @@ and JSON parsing must be robust.
 
 ### Teammate onboarding (README)
 
-1. `/plugin marketplace add <hashsmith git url>`, then `/plugin install hashsmith@hashlogics`.
+1. `/plugin marketplace add Hashlogics/hashsmith`, then `/plugin install hashsmith@hashlogics`.
    Turn on auto-update for the marketplace, or run `/plugin marketplace update hashlogics` after
    a release is announced.
-2. `/mcp`: sign in to HashOps (OAuth, acting as yourself), SonarQube (token in your environment)
-   and Sentry.
+2. `/mcp`: sign in to HashOps (OAuth, acting as yourself). SonarQube and Sentry are optional and
+   your own installs (below).
 3. In a project folder: `claude`, then `/hashsmith:onboard-project`.
 
 ### MCP servers (`.mcp.json`)
@@ -127,8 +127,17 @@ and JSON parsing must be robust.
 | Server | Purpose | Auth |
 | --- | --- | --- |
 | `hashops` | Projects, boards, tasks, comments, attachments, meetings, project links. URL: `https://ugcjbklxjpmgrxgvchtn.supabase.co/functions/v1/mcp`, the Hashlogics tenant's connector, which is the tenant's Supabase URL plus `/functions/v1/mcp` (see `mcpConnectorUrl` in hashops) | OAuth as the signed-in employee. RLS and permissions apply, and every call is logged in `agent_actions` |
-| `sonarqube` | Issues on changed files during self-review; hotspots during triage | Per-person token from the environment |
-| `sentry` | Issue details, stack traces and breadcrumbs during triage | OAuth |
+
+**SonarQube and Sentry are not declared by the plugin** (decided 2026-10-28). Most developers
+already have them: a SonarQube MCP of their own, and Sentry through the official `sentry` plugin.
+Declaring them again started a second SonarQube container and a second Sentry sign-in. The skills
+use whichever SonarQube / Sentry MCP tools the session has (matched by tool name, not server
+name):
+
+| Tool family | Used for |
+| --- | --- |
+| SonarQube MCP | Issues on changed files during self-review; hotspots during triage |
+| Sentry MCP (the `sentry` plugin) | Issue details, stack traces and breadcrumbs during triage |
 
 If a server is missing or not signed in, the skill that needs it skips that step, says so, and
 carries on. Hashsmith uses only its own plugin-declared `hashops` server, so that the scope hook
@@ -292,10 +301,10 @@ Hashsmith up for a project.
    `list_my_projects`. One match: confirm it. Several or none: ask.
 3. Find the board: `list_boards` for the project with `status: active`. One: use it. Several: ask.
 4. Map To Do, In Progress, Review, QA and Done from `get_board` lists by name. If a name differs,
-   ask which list it is. Boards created before QA joined the defaults have no QA list, so ask the
-   developer to add it once in HashOps.
-5. Check that the `ai` tag exists via `list_project_tags`. If it does not, ask the developer to
-   create it once in HashOps. Tags are per project, and `create_task` requires at least one.
+   ask which list it is. Boards created before QA joined the defaults have no QA list: propose
+   adding it with `create_board_list` (`before_list_id` = Done).
+5. Check that the `ai` tag exists via `list_project_tags`. If it does not, propose creating it with
+   `create_project_tag`. Tags are per project, and `create_task` requires at least one.
 6. Work out the Sonar key (`hashlogics_` + repo name, or `sonar-project.properties`) and the
    Sentry project. Ask when unsure.
 7. **Local readiness report.** One table of checks, each reported as pass, fail or blocked:
@@ -673,6 +682,7 @@ evals never touch real HashOps. A release that turns a scenario red is not done.
 | H4 | `npm run dev:local-users` **replaces** `dev:local-admin`, and every reference is updated (CLAUDE.md commands table, docs, skills) | QA needs one user per role (below) |
 | H5 | `.claude/settings.json`: `Bash(git switch *)` moves from `deny` to `ask`. The Team Workflow line in `CLAUDE.md` changes to match | Hashsmith creates `ai/*` branches (§9) |
 | H6 | Migration `20261028150000_project_documents_bucket.sql`: creates the public `project-documents` bucket where it is missing, plus storage policies for `task-attachments/` (members of the task's project upload, read, delete) | The bucket only existed in the first tenant's dashboard, so attachments failed on local stacks and new tenants, and H2 could not be tested locally |
+| H7 | Three `work_admin` tools, added 2026-10-28: `create_project_tag`, `create_board_list` (`before_list_id` puts QA before Done), `add_project_link`; plus `update_project`/`create_project` take `project_management` (in-app PM on/off) | Onboarding needs the `ai` tag, QA on older boards, PM on and the repo link on every project; doing them by hand in the UI each time was the slowest onboarding step |
 
 **`dev:local-users`** grows out of `scripts/dev/local-admin.sh` and keeps its local-only guard.
 - **Admin:** it creates `admin@example.com` exactly as today.
@@ -683,14 +693,13 @@ evals never touch real HashOps. A release that turns a scenario red is not done.
 - **No config needed:** `qa` finds the users by the same convention, so nothing goes in
   `hashsmith.json`.
 
-**No tools for tags or lists.** The `ai` tag is created once per project, and the QA list arrives
-with the defaults (H3). Only boards that already exist need QA added by hand, once. MCP tools for
-these would be a write surface with almost no use.
+**Tags, lists and links are tools (H7).** This reverses the first decision (no tools): every
+onboarded project needs the `ai` tag, older boards need QA, and `list_project_links` is how
+onboarding finds the project, so each would otherwise be a manual UI step per project. Each tool
+mirrors the app's form and RLS; edits and deletes stay in the app.
 
 ### Once, by hand
 
-- In HashOps: create the `ai` tag on hashops. Add a QA list to the currently active hashops
-  board. Create the Hashsmith project, with its board and the `ai` and `feedback` tags.
 - Locally: Turnstile test keys in `.env`, and the local mail catcher reachable.
 
 ## 15. Rollout

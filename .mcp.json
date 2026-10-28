@@ -3,14 +3,6 @@
     "hashops": {
       "type": "http",
       "url": "https://ugcjbklxjpmgrxgvchtn.supabase.co/functions/v1/mcp"
-    },
-    "sonarqube": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "-e", "SONARQUBE_TOKEN", "-e", "SONARQUBE_URL", "mcp/sonarqube"]
-    },
-    "sentry": {
-      "type": "http",
-      "url": "https://mcp.sentry.dev/mcp"
     }
   }
 }

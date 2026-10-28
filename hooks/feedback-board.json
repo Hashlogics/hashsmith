@@ -1,6 +1,6 @@
 {
-  "_comment": "The Hashsmith project's feedback board: the one cross-project HashOps target the scope hook allows (design §10, §12). Filled once the Hashsmith project exists in HashOps; empty means no exception.",
-  "project_id": "",
-  "board_id": "",
-  "project_key": ""
+  "_comment": "The Hashsmith project's feedback board: the one cross-project HashOps target the scope hook allows (design §10, §12). An empty value means no exception for that field.",
+  "project_id": "2c9f7cfd-be3c-49f5-8661-e0b59f9161b3",
+  "board_id": "3dea74ea-5fd0-41ea-8e16-023354d1d477",
+  "project_key": "HSM"
 }

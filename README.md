@@ -13,9 +13,12 @@ step. You review every change; Hashsmith never commits, pushes or deploys.
 In Claude Code:
 
 ```
-/plugin marketplace add <hashsmith git url>
+/plugin marketplace add Hashlogics/hashsmith
 /plugin install hashsmith@hashlogics
 ```
+
+The repo is private: you need read access to `github.com/Hashlogics/hashsmith`, with your GitHub
+credentials working for `git clone` (SSH key or `gh auth login`).
 
 Turn on auto-update for the `hashlogics` marketplace, or run `/plugin marketplace update
 hashlogics` when a release is announced. After a release, your next session starts with a short
@@ -23,15 +26,18 @@ hashlogics` when a release is announced. After a release, your next session star
 
 ## Connect the tools
 
-Run `/mcp` and sign in to the servers Hashsmith declares:
+Run `/mcp` and sign in to `hashops`, the one server Hashsmith declares: Authenticate, then Approve
+on the HashOps page. You act as yourself, with your own access (projects, boards, tickets,
+comments, files).
 
-| Server      | What for                                     | How you sign in                                        |
-| ----------- | -------------------------------------------- | ------------------------------------------------------ |
-| `hashops`   | Projects, boards, tickets, comments, files    | Authenticate, then Approve on the HashOps page. You act as yourself, with your own access |
-| `sonarqube` | Issues on changed files during self-review   | `SONARQUBE_TOKEN` and `SONARQUBE_URL` in your shell environment; needs Docker |
-| `sentry`    | Issue details during bug triage              | Authenticate                                           |
+Optional, and your own installs (Hashsmith doesn't declare them, so you never run two copies):
 
-A server you skip is skipped by the skills that need it, and they tell you so. If you also added
+| Tool      | What for                                   | How to get it                             |
+| --------- | ------------------------------------------ | ----------------------------------------- |
+| SonarQube | Issues on changed files during self-review | Your SonarQube MCP server                 |
+| Sentry    | Issue details during bug triage            | The official `sentry` Claude Code plugin  |
+
+A tool you don't have is skipped by the skills that need it, and they tell you so. If you also added
 HashOps yourself (for example as `peoplemuster` from the in-app Connect dialog), keep it for your
 own use: Hashsmith only uses its own `hashops` server, so that its project-scope guard applies.
 
