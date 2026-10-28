@@ -1,0 +1,2 @@
+- [ ] Checks browser_network_requests after the first page load, before logging in.
+- [ ] Stops with "QA runs locally only: this app talks to <origin>"; no login, no clicks, no board move.

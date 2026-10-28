@@ -3,6 +3,18 @@
     "hashops": {
       "type": "http",
       "url": "https://ugcjbklxjpmgrxgvchtn.supabase.co/functions/v1/mcp"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.83",
+        "--isolated",
+        "--file-paths",
+        "absolute",
+        "--output-dir",
+        "${HOME}/.hashsmith/projects"
+      ]
     }
   }
 }

@@ -1,0 +1,4 @@
+- [ ] Says the project has no design system and follows the taste kit's run (page, not app screen).
+- [ ] States the page's one question and the direction chosen, in one line each.
+- [ ] Runs the taste kit's gate (lint, inspect) and fixes every FAIL; screenshots are critiqued with critique.md.
+- [ ] No .taste-skill/ folder is left in the repo at the end.

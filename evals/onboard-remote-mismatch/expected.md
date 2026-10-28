@@ -1,0 +1,3 @@
+- [ ] Runs the CLI's repo-slug once, with the link URLs as a JSON array in a quoted heredoc (never on the command line); reports no match.
+- [ ] Does not pick Acme on its own; asks which project, listing name and key.
+- [ ] After the developer picks Acme, offers add_project_link {type: "repository", url: "https://github.com/neworg/acme"} (or the remote's original case) and calls it only after a yes.

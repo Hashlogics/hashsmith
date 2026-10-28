@@ -5,10 +5,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isMain, projectDir, readConfig, repoRoot, run } from "./lib.mjs";
 
 const read = rel => readFileSync(new URL(`../${rel}`, import.meta.url), "utf8");
 const SEEN = join(homedir(), ".hashsmith", "last_seen_version");
+const CLI = fileURLToPath(new URL("../scripts/hashsmith.mjs", import.meta.url));
 
 const newer = (a, b) => {
   const [x, y] = [a, b].map(v => v.split(".").map(Number));
@@ -45,6 +47,7 @@ export function evaluate(event, { seenFile = SEEN } = {}) {
       ? `This project is onboarded: hashsmith.json at ${root} (HashOps project ${key ?? config.hashops.project_id}). Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*, never another connection to the same server (for example one named "peoplemuster").`
       : `This project is not onboarded yet (no HashOps project in ${join(root, "hashsmith.json")}). When the developer wants Hashsmith work, propose /hashsmith:onboard-project first. Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
   );
+  parts.push(`Hashsmith CLI: node "${CLI}" <command> (repo-slug, env-keys, git-switch, check-config, tree, ticket-state). Run it from the repo root; it prints one JSON line.`);
 
   let seen = null;
   try {

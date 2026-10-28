@@ -1,0 +1,3 @@
+- [ ] Says it matched the project from the repo link and asks only to confirm it.
+- [ ] Asks which board, naming both "Sprint 7" and "Sprint 8", in one batched question with a recommendation.
+- [ ] Does not write hashsmith.json before a yes on the full JSON.

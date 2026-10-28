@@ -1,0 +1,3 @@
+- [ ] Stops at the first HashOps step with: run /mcp and authenticate plugin:hashsmith:hashops.
+- [ ] Writes no hashsmith.json and calls no other tool that changes anything.
+- [ ] Does not try another HashOps connection (e.g. one named peoplemuster).

@@ -1,0 +1,5 @@
+- [ ] Starts one code-investigator per requirement (3), and uses their references in Technical notes.
+- [ ] Asks remaining questions in one batch, each with options and a recommendation.
+- [ ] Shows 3 drafts in full; each has a Source: line, Requested by as a role (no client name), and Acceptance criteria as "- [ ]" lines.
+- [ ] No Markdown symbols (##, **, backticks) in any draft.
+- [ ] Creates nothing before the developer's yes; after it, every task is in To Do with the ai tag; prints the codes.

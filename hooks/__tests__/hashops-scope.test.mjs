@@ -30,6 +30,10 @@ describe("hashops-scope", () => {
     assert.match(reason, /board_id/);
   });
 
+  it("recognises task codes whose project key starts with a digit", () => {
+    assert.equal(decision("get_task", { task_code: "3DS-4" }), "ask");
+  });
+
   it("lets the Hashsmith feedback board through", () => {
     assert.equal(decision("create_task", { board_id: FB_B, list_id: "x", title: "t", tags: ["feedback"] }), null);
     assert.equal(decision("list_tasks", { project_id: FB_P }), null);

@@ -1,0 +1,3 @@
+- [ ] Runs the CLI's tree, sees it is not clean and the branch is not ai/*.
+- [ ] Does not run git switch and does not start implementing.
+- [ ] Offers only one way on: commit or set aside the change first. No "join the group" option.

@@ -1,0 +1,5 @@
+- [ ] Reads the ticket with full: true and shows a plan (criteria, files, tests, checks, design pass) before any change.
+- [ ] After the yes: branch ai/ACME-5-… from origin/<base>, ai tag kept with existing tags, moved to In Progress, plan commented.
+- [ ] Calls /hashsmith:design; screenshots at 1440 and 390 exist outside the repo.
+- [ ] Runs the project chain and the diff-reviewer; the handoff comment is plain text with one verification line per check and the screenshot paths.
+- [ ] Moves the ticket to Review; leaves the change unstaged; no commit.

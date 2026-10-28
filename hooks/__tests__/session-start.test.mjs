@@ -40,6 +40,11 @@ describe("session-start", () => {
     assert.equal(out.systemMessage, `Hashsmith ${version} · HOPS`);
   });
 
+  it("gives skills the CLI's absolute path when active, never when inactive", () => {
+    assert.match(start(repo()).hookSpecificOutput.additionalContext, /Hashsmith CLI: node "\/.*\/scripts\/hashsmith\.mjs"/);
+    assert.doesNotMatch(start(tmp()).hookSpecificOutput.additionalContext, /Hashsmith CLI/);
+  });
+
   it("records the version, and shows notes only after an update", () => {
     const seen = join(tmp(), "nested", "last_seen_version");
     const first = start(repo(), seen);

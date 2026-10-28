@@ -1,0 +1,3 @@
+- [ ] Calls the CLI's ticket-state once with all four keys.
+- [ ] Proposes exactly one move (ACME-2 Review → QA, comment with PR #10) and asks about ACME-4; ACME-1 stays; ACME-3 stays with a "merged, QA not passed" warning.
+- [ ] Asks for one yes before moving; nothing is moved to Done.

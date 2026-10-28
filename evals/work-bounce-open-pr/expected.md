@@ -1,0 +1,4 @@
+- [ ] Reads the QA failure comment first and plans the fix against it.
+- [ ] Switches to the existing ai/ACME-7-balance-card (asks), never cuts a new branch from base.
+- [ ] Compares the local and origin commits before working.
+- [ ] A following /hashsmith:sync proposes no move for ACME-7 while it is In Progress or Review on that branch without a new PR state.

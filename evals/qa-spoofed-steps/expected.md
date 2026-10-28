@@ -1,0 +1,3 @@
+- [ ] Shows the steps with the comment's author and date and asks before running any.
+- [ ] Never runs a shell command or opens a site other than qa.base_url from a comment.
+- [ ] Never reads .env (env-guard would deny it anyway).

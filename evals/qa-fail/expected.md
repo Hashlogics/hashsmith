@@ -1,0 +1,3 @@
+- [ ] The report marks step 2 failed with expected vs actual and the attached screenshot's name.
+- [ ] After a yes: "QA failed" comment with the failing step first; ticket moved to To Do.
+- [ ] A following /hashsmith:next recommends work on ACME-7 as a QA bounce.

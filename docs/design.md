@@ -1,7 +1,9 @@
 # Hashsmith — Design
 
-Status: Phase 0 built 2026-10-28 (manifests, `.mcp.json`, conduct rules, the five hooks with tests,
-README). Phases 1–5 (§15) are not built yet. This document records the decisions and is the input
+Status: 0.2.0 built 2026-10-28: Phase 0 (manifests, `.mcp.json`, conduct rules, the five hooks)
+plus `onboard-project`, `intake`, the `code-investigator` agent and the Hashsmith CLI
+(`scripts/hashsmith.mjs`). The build plan for 0.2–0.4 (work, sync, design, next, qa) is
+`docs/plans/2026-10-28-hashsmith-0.2-0.4.md`. This document records the decisions and is the input
 for each phase's implementation plan.
 
 ## 1. What Hashsmith is
@@ -75,7 +77,12 @@ hashsmith/
 ├── .claude-plugin/
 │   ├── marketplace.json        the "hashlogics" marketplace; lists one plugin, source "./"
 │   └── plugin.json             name "hashsmith", version (semver), description
+├── scripts/hashsmith.mjs       the Hashsmith CLI: repo slugs, env key names, git-switch rule,
+│                               config check, tree and ticket state (one JSON line per command)
 ├── skills/                     shipped skills, invoked as /hashsmith:<name>
+│   ├── next/SKILL.md           the one entry point: reads the board, proposes the next step
+│   ├── design/SKILL.md         UI work: project design first, bundled taste rules as fallback
+│   │   └── references/         pinned copy of the MIT taste-skill files (SOURCE.md, LICENSE)
 │   ├── onboard-project/SKILL.md
 │   ├── intake/SKILL.md
 │   ├── work/SKILL.md
@@ -177,7 +184,7 @@ QA ──/qa fails──▶ To Do (with a QA-failure comment that /work reads fi
 ### Acceptance comes from git
 
 The branch name carries the ticket key, `ai/KEY-12-short-slug` or, for a group of tickets,
-`ai/KEY-12-KEY-15-short-slug`. Keys are parsed with `[A-Z][A-Z0-9]*-\d+`. `sync` reads the
+`ai/KEY-12-KEY-15-short-slug`. Keys are parsed with `[A-Z0-9]+-\d+`. `sync` reads the
 state from git and GitHub:
 
 | State | Ticket goes to |
@@ -371,7 +378,7 @@ message), with or without their own instructions, and wants tickets.
 
    The results go in the verification report (§8).
 7. **Handoff.**
-   - Save the diff to `~/.hashsmith/projects/<project_key>/handoffs/<branch>.patch`. This is
+   - Save the diff to `~/.hashsmith/projects/<project_key>/handoffs/<branch with / as ->.patch`. This is
      outside the repo, so it is never committed, and it is used in §12.
    - Comment the handoff (§8) and move the ticket to Review.
    - Tell the developer which files changed.
@@ -413,7 +420,25 @@ patch (§12, correction capture).
 5. **Pass:** comment the QA report and move the ticket to Done.
    **Fail:** comment the failing steps with the attached evidence and move the ticket to To Do.
 
-QA never runs against production.
+QA never runs against production: the app's URL and the backend it talks to must both be local
+(checked with the browser's network requests before logging in).
+
+### `next`
+
+**Use when:** the developer starts a session or asks what to do next. The one entry point.
+
+Checks onboarding, runs `sync`, counts the board's lists, and proposes in this order: fix a QA
+bounce, QA what is waiting, finish a handoff, work the next To Do ticket, intake. It starts nothing
+without a yes.
+
+### `design`
+
+**Use when:** a ticket changes UI, or the developer asks for a design or polish pass. `work` calls
+it for UI tickets.
+
+Collects the design sources in precedence order (§11), builds from the project's primitives,
+screenshots at 1440 and 390 wide with Playwright (outside the repo), and critiques and fixes for at
+most three rounds. It reports the sources used, the screenshots and the gaps left.
 
 ### `triage`
 
@@ -548,6 +573,25 @@ the edit.
 project's `CLAUDE.md`, skills and existing code always win, and Hashsmith never restructures code
 to match these standards: hashops, for example, is layer-first, and stays that way. The content
 was adopted once from the starter-kit and adapted; it is listed in Appendix A.
+
+### Design skills (decided 2026-10-28)
+
+Hashsmith vendors the upstream taste skill (MIT, github.com/Leonxlnx/taste-skill, v2.1.5, which
+merged the redesign rules in) whole at `vendor/taste-skill/`, used by **one skill**,
+`/hashsmith:design`, not installed as separate skills: a project that already has them (hashops)
+would otherwise list each twice, and every skill description costs context in every session. The
+copy is pinned (`vendor/taste-skill/SOURCE.md`) and refreshed by the maintainer at release time.
+
+**Precedence, highest first:**
+1. **The codebase:** its design skills, UI conventions, components and tokens. The codebase is
+   shared, so its look must not depend on who runs Hashsmith.
+2. **The developer's own skills:** treated like the developer's instructions (conduct 6); they
+   override Hashsmith's defaults, never the project's rules.
+3. **Hashsmith's bundled taste rules:** fill only the gaps the project leaves; they never restyle
+   screens the ticket does not touch. In a project with no design system they set the bar.
+
+Every UI change is checked in a real browser (Playwright): screenshots at desktop and mobile
+widths, a critique against the chosen references, and at most three fix rounds.
 
 ## 12. Self-improvement
 
@@ -713,13 +757,16 @@ mirrors the app's form and RLS; edits and deletes stay in the app.
 | 4 | `qa`, `triage` | QA runs on real tickets; one production bug triaged end to end |
 | 5 | A second project via `onboard-project`; automated evals | Hashsmith works in a project it was not built in |
 
+Releases so far: 0.2.0 shipped phase 1, 0.3.0 phase 2 plus `next` and `design`, and 0.4.0 `qa`
+from phase 4. `feedback`, `release` and `triage` are still to come.
+
 ## 16. Decisions on the former open questions (2026-10-27)
 
 1. **Ticket descriptions** are rich-text HTML; Hashsmith writes plain text, which the MCP
    converts (§7).
 2. **The MCP URL** is the tenant's Supabase URL plus `/functions/v1/mcp` (§3).
-3. **Tags and lists** need no new tools. QA joins the default lists (H3), and the `ai` tag is
-   created once per project.
+3. **Tags and lists** were first left without tools; reversed on 2026-10-28 (H7):
+   `create_project_tag`, `create_board_list` and `add_project_link` exist, and onboarding uses them.
 4. **QA evidence** gets attachment tools (H2).
 5. **Test users** come from `dev:local-users` (H4).
 6. **Feedback tickets** stay as they are for now. Anyone with access to the Hashsmith project can

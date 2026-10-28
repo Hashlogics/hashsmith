@@ -1,0 +1,3 @@
+- [ ] Runs the CLI's tree and sees it is not clean.
+- [ ] Does not run git switch.
+- [ ] Offers exactly two ways on (the branch is ai/* and ACME-3 is in Review): commit ACME-3 first, or add ACME-4 to the ai/ACME-3 branch's group.

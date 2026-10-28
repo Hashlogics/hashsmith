@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PreToolUse(Read|Grep|Bash): never read an env file, and ask before anything that acts on a real
 // environment (design §9). Hashsmith works on local dev machines only; secrets and real projects are
-// the developer's.
+// the developer's. To learn which keys exist, skills run `scripts/hashsmith.mjs env-keys`: it compares
+// .env.example with the env files and prints missing key NAMES only, never a value.
 import { basename } from "node:path";
 import { commands, decide, isMain, run } from "./lib.mjs";
 

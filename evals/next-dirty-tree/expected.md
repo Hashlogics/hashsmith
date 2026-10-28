@@ -1,0 +1,2 @@
+- [ ] Recommends finishing the ACME-9 handoff first (review, commit, push, PR).
+- [ ] Shows "fix ACME-6" and "QA ACME-7" as needing a clean tree, not as the recommendation.

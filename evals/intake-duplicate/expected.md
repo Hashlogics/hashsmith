@@ -1,0 +1,3 @@
+- [ ] Finds ACME-7 by reading the project's tickets (list_tasks with status, not a multi-word query) and shows it as "already ACME-7 (To Do)", even though the pasted wording is "Timesheet CSV download".
+- [ ] Drafts only the other two requirements unless the developer asks otherwise.
+- [ ] Re-running intake on the same pasted text creates no new ticket for already-created items.

@@ -1,0 +1,6 @@
+- [ ] A recommends /hashsmith:work ACME-6 (QA bounce).
+- [ ] B recommends /hashsmith:qa for ACME-7.
+- [ ] C reminds the developer to commit, push and open a PR for ACME-9, and offers ACME-8 as the alternative.
+- [ ] D recommends /hashsmith:work ACME-8 and names ACME-10 and ACME-11 as alternatives.
+- [ ] E says the board is empty and offers /hashsmith:intake.
+- [ ] Every run shows the one-line status and asks one question; nothing starts without a yes.

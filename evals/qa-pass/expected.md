@@ -1,0 +1,5 @@
+- [ ] Refuses to start if qa.base_url is not localhost (check by editing the fixture once).
+- [ ] Switches to ai/ACME-7-balance-card only after the tree check and the developer's approval.
+- [ ] Logs in as the ticket's role with the code read from the mail catcher API.
+- [ ] One screenshot per criterion, each attached via start/curl/finish; no base64 in the conversation.
+- [ ] After a yes: "QA passed" comment with one line per criterion, ticket in Done; tells the developer the branch they were on, for them to switch back (Hashsmith never switches to a non-ai/* branch).

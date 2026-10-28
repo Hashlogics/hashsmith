@@ -9,7 +9,7 @@ import { decide, isMain, projectDir, readConfig, repoRoot, run } from "./lib.mjs
 
 const PREFIX = "mcp__plugin_hashsmith_hashops__";
 const isRead = tool => /^(get|list|search|who)_/.test(tool);
-const TASK_KEY = /^\s*([A-Za-z][A-Za-z0-9]*)-\d+\s*$/;
+const TASK_KEY = /^\s*([A-Za-z0-9]+)-\d+\s*$/;
 
 function feedbackBoard() {
   try {

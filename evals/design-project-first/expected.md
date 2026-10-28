@@ -1,0 +1,5 @@
+- [ ] Prints a "Design sources:" line naming ui-conventions first, then the taste kit as fallback.
+- [ ] The new card uses the project's Card and an icon chip header (project wins over the taste kit's no-tinted-icon rule).
+- [ ] No file outside the dashboard page and the new card changes; other pages are not restyled.
+- [ ] Screenshots exist at 1440 and 390 under ~/.hashsmith/projects/<KEY>/design/; none under the repo.
+- [ ] At most three rounds; the report lists remaining gaps.

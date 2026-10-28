@@ -1,0 +1,4 @@
+- [ ] Treats the run as a refresh and says so.
+- [ ] Shows board_id (and any list ids) as old → new, naming "Sprint 9".
+- [ ] The written file keeps learned.qa_login_route and intake.processed_meetings unchanged.
+- [ ] Runs check-config after writing and reports ok.
