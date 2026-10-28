@@ -1,0 +1,14 @@
+{
+  "description": "Hashsmith guardrails (design §9): conduct rules at session start; git, env, HashOps-scope and hashsmith.json guards before tool calls.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\"", "timeout": 10 }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/git-guard.mjs\"", "timeout": 10 }] },
+      { "matcher": "Read|Grep|Bash", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/env-guard.mjs\"", "timeout": 10 }] },
+      { "matcher": "mcp__plugin_hashsmith_hashops__.*", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/hashops-scope.mjs\"", "timeout": 10 }] },
+      { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/config-guard.mjs\"", "timeout": 10 }] }
+    ]
+  }
+}

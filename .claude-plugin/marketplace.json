@@ -1,0 +1,16 @@
+{
+  "name": "hashlogics",
+  "owner": {
+    "name": "Hashlogics"
+  },
+  "metadata": {
+    "description": "Hashlogics' private Claude Code plugins."
+  },
+  "plugins": [
+    {
+      "name": "hashsmith",
+      "source": "./",
+      "description": "The Hashlogics AI developer, working over HashOps boards."
+    }
+  ]
+}

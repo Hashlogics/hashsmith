@@ -1,0 +1,11 @@
+{
+  "name": "hashsmith",
+  "private": true,
+  "type": "module",
+  "description": "Development scripts for the Hashsmith plugin. The plugin itself has no dependencies.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"hooks/__tests__/*.test.mjs\"",
+    "validate": "claude plugin validate ."
+  }
+}
