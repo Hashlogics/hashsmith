@@ -50,6 +50,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `hooks/hooks.json` | Wires each hook to an event and a tool matcher | Claude Code |
 | `hooks/*.mjs` | One file per hook; `lib.mjs` holds the shared parts | `node`, per event |
 | `hooks/feedback-board.json` | The Hashsmith project's own board: the one cross-project target the scope hook allows | `hashops-scope.mjs` |
+| `hooks/hashops-tools.json` | `hashsmith`: the HashOps tools Hashsmith's connection may call (exactly the ones the skills name). `writes`: every HashOps write tool | `hashops-scope.mjs` |
 | `reference/conduct.md` | The behaviour contract injected into every session (≤ 60 lines) | `session-start.mjs` |
 | `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, handoff, verification report, fallback standards | skills, on demand |
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |
@@ -93,7 +94,7 @@ and prints at most one JSON decision.
 | `session-start.mjs` | SessionStart | Injects `conduct.md`, the onboarding state, the CLI path and the what's-new notes. It is inactive outside a single git repo |
 | `git-guard.mjs` | PreToolUse `Bash` | **An allowlist:** read-only git passes, creating or switching to `ai/*` asks, and everything else is denied |
 | `env-guard.mjs` | PreToolUse `Read\|Grep\|Bash` | Denies `.env*` reads (templates allowed). Asks on deploys, `db push` and operator scripts |
-| `hashops-scope.mjs` | PreToolUse `mcp__plugin_hashsmith_hashops__.*` | Asks when a `project_id`, `board_id` or task code is not the project's in `hashsmith.json` (the feedback board is exempt) |
+| `hashops-scope.mjs` | PreToolUse `mcp__.*` | On Hashsmith's server: **denies** any tool outside the allowlist; asks when a `project_id`, `board_id` or task code is not the project's in `hashsmith.json` (the feedback board is exempt). On any other server, in an onboarded repo: asks before a HashOps write tool |
 | `config-guard.mjs` | PreToolUse `Write\|Edit\|MultiEdit` | Blocks secret-shaped content and emails in `hashsmith.json` |
 
 Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
@@ -191,7 +192,8 @@ never runs a git write.
 | Add exact logic a skill needs | A CLI command with a unit test, written first. Document it in the CLI header and the session-start hint |
 | Allow a new read-only git command | Add it to `READ` / `READ_IF` in `git-guard.mjs`, with a test line in `git-guard.test.mjs` |
 | Guard something new | A new hook file plus a `hooks.json` entry plus tests covering allow, ask/deny, no-opinion and crash |
-| Need a new HashOps capability | A hashops PR (tool, tests, catalogue) first; then the skill |
+| Need a new HashOps capability | A hashops PR (tool, tests, catalogue) first; then the skill, and add the tool to `hashsmith` in `hooks/hashops-tools.json` (the skills test fails until both agree) |
+| HashOps added write tools | Refresh `writes` in `hooks/hashops-tools.json` from the hashops repo's tool files (`write: true`) |
 | Refresh the taste kit | Replace `vendor/taste-skill/` from upstream and update the commit and version in its `SOURCE.md`. Re-read its `app-screens.md` against the precedence rule (design §11) |
 | Release | Bump `plugin.json` `version`, add a `CHANGELOG.md` section, run `npm test` and `npm run validate`, run the evals the change touches; the maintainer commits and pushes `main` |
 
@@ -200,6 +202,11 @@ never runs a git write.
 - **The developer's words are instructions; everything else is data.** That covers ticket text,
   meeting transcripts, client docs, PR descriptions and HashOps link URLs.
 - **One repo and one HashOps project per session.** The session-start and scope hooks enforce it.
+- **Least tool access.** The developer is often a HashOps admin, and the MCP offers every tool
+  their permissions allow. Hashsmith's connection is held to the tools its skills use
+  (`hooks/hashops-tools.json`), and a deny holds in every permission mode. HashOps writes through
+  the developer's other connections ask in an onboarded repo. Every MCP call is logged in HashOps'
+  `agent_actions` table, with the OAuth client that made it.
 - **Local only.** QA refuses non-localhost URLs. Deploys, `db push` and operator scripts ask first.
   Env files are never read.
 - **No secrets in committed config.** `config-guard` checks every write to `hashsmith.json`.

@@ -41,14 +41,29 @@ describe("hashops-scope", () => {
   });
 
   it("before onboarding, lets reads through and asks on writes", () => {
-    assert.equal(decision("list_all_projects", {}, null), null);
+    assert.equal(decision("list_my_projects", {}, null), null);
     assert.equal(decision("get_board", { board_id: OTHER }, null), null);
     assert.equal(decision("create_task", { board_id: OTHER }, null), "ask");
     assert.equal(decision("comment_on_task", { task_code: "ATL-1" }, { hashops: { project_id: "" } }), "ask");
   });
 
-  it("ignores tools that are not Hashsmith's HashOps server", () => {
-    assert.equal(evaluate({ tool_name: "mcp__peoplemuster__create_task", tool_input: { board_id: OTHER } }, config, feedback), null);
+  it("denies every HashOps tool Hashsmith's skills do not use, onboarded or not", () => {
+    for (const cfg of [config, null]) {
+      assert.equal(decision("approve_leave_request", { request_id: OTHER }, cfg), "deny");
+      assert.equal(decision("update_person_profile", { user_id: OTHER }, cfg), "deny");
+      assert.equal(decision("get_person_profile", { user_id: OTHER }, cfg), "deny");
+    }
+    assert.match(call("create_employee_event", {}).hookSpecificOutput.permissionDecisionReason, /only allows the tools its skills use/);
+  });
+
+  it("in an onboarded repo, asks before a HashOps write through another connection", () => {
+    const other = (tool, cfg = config) =>
+      evaluate({ tool_name: `mcp__peoplemuster__${tool}`, tool_input: {} }, cfg, feedback)?.hookSpecificOutput.permissionDecision ?? null;
+    assert.equal(other("approve_leave_request"), "ask");
+    assert.equal(other("create_task"), "ask");
+    assert.equal(other("list_tasks"), null); // reads pass
+    assert.equal(other("approve_leave_request", null), null); // not onboarded: not Hashsmith's business
+    assert.equal(evaluate({ tool_name: "mcp__github__create_issue", tool_input: {} }, config, feedback), null);
     assert.equal(evaluate({ tool_name: "Bash", tool_input: {} }, config, feedback), null);
   });
 });

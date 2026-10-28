@@ -70,6 +70,11 @@ Node 22 or newer. No npm install is needed; the plugin has no dependencies.
   nothing from one project's code, names or data goes into it. Examples use `ACME`.
 - **New HashOps capability = hashops PR first.** Skills only call tools that exist in the hashops
   repo's `supabase/functions/_shared/agent-tools/tools/`. Check names and arguments there.
+- **Least tool access.** Hashsmith's HashOps connection may call only the tools in
+  `hooks/hashops-tools.json` `hashsmith`, which must equal the tools the skills name (the skills
+  test checks both ways). Never widen it for convenience; a tool that writes people, approvals,
+  policies or HR records does not belong to a developer workflow. Refresh `writes` when HashOps
+  adds write tools.
 - **Releases:** bump `plugin.json` `version` and add a `CHANGELOG.md` section (`## x.y.z — date`,
   two or three lines for developers); session-start shows teammates the sections newer than the
   version they last saw. Keep the README's status line and command table in step.

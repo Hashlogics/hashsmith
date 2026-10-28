@@ -1,9 +1,15 @@
 #!/usr/bin/env node
-// PreToolUse(mcp__plugin_hashsmith_hashops__.*): keep HashOps calls on this project (design §10).
-// The MCP sees every project the developer can see, so a project_id, board_id or task_code that is
-// not the one in hashsmith.json turns the call into an ask that names the mismatch. The Hashsmith
-// feedback board (feedback-board.json) is the one allowed exception. Before onboarding, reads pass
-// and writes ask. A call that matches gets no opinion: RLS and the normal permission flow decide.
+// PreToolUse(mcp__.*): keep HashOps calls to what Hashsmith needs, on this project (design §10).
+// 1. Hashsmith's own HashOps connection may call only the tools its skills use
+//    (hashops-tools.json `hashsmith`); everything else is denied, whatever the permission mode. The
+//    developer is often an admin, and the MCP offers every tool their permissions allow.
+// 2. The MCP sees every project the developer can see, so a project_id, board_id or task_code that
+//    is not the one in hashsmith.json turns the call into an ask that names the mismatch. The
+//    Hashsmith feedback board (feedback-board.json) is the one allowed exception. Before
+//    onboarding, reads pass and writes ask.
+// 3. In an onboarded repo, a HashOps write through another connection to the same server (for
+//    example the developer's own "peoplemuster") asks: Hashsmith's guards do not cover it.
+// A call that passes gets no opinion: RLS and the normal permission flow decide.
 import { readFileSync } from "node:fs";
 import { decide, isMain, projectDir, readConfig, repoRoot, run } from "./lib.mjs";
 
@@ -18,13 +24,22 @@ function feedbackBoard() {
     return {};
   }
 }
+// Read at load: a missing or broken file makes the hook crash, and run() then asks (fail closed).
+const TOOLS = JSON.parse(readFileSync(new URL("./hashops-tools.json", import.meta.url), "utf8"));
 
 export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) ?? projectDir(event)), feedback = feedbackBoard()) {
   const name = String(event.tool_name ?? "");
-  if (!name.startsWith(PREFIX)) return null;
-  const tool = name.slice(PREFIX.length);
   const input = event.tool_input ?? {};
   const h = config?.hashops ?? {};
+  if (!name.startsWith(PREFIX)) {
+    const m = /^mcp__(.+?)__([a-z_]+)$/.exec(name);
+    if (m && h.project_id && TOOLS.writes.includes(m[2]))
+      return decide("ask", `\`${m[2]}\` writes to HashOps through "${m[1]}", not Hashsmith's own connection, so Hashsmith's checks do not cover it. Confirm only if you asked for this write yourself.`);
+    return null;
+  }
+  const tool = name.slice(PREFIX.length);
+  if (!TOOLS.hashsmith.includes(tool))
+    return decide("deny", `Hashsmith's HashOps connection only allows the tools its skills use (hooks/hashops-tools.json); \`${tool}\` is not one of them. If the developer wants this done, they can do it in HashOps or through their own connection.`);
 
   if (!h.project_id) {
     if (isRead(tool)) return null;

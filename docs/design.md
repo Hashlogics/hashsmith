@@ -533,7 +533,7 @@ A project's own `deny` rules still win over the plugin.
 | --- | --- | --- |
 | `git-guard.mjs` | PreToolUse Bash | **ask** for `git switch -c ai/*` and `git switch ai/*`. **Deny** every other git write: `add`, `commit`, `push`, `pull`, `stash`, `reset`, `restore`, `checkout`, `merge`, `rebase`, `cherry-pick`, `revert`, `rm`, `mv`, `clean`, `tag`, `branch -d/-D/-m/-M`, `update-index`, `apply --index/--cached`. Read-only git and `git fetch` are allowed |
 | `env-guard.mjs` | PreToolUse Read, Bash | **Deny** reading `.env*` (except `.env.example`). **Ask** before anything that touches a real environment: `supabase db push`, `supabase functions deploy`, `supabase secrets set`, `supabase link`, `prisma migrate deploy`, `alembic upgrade` outside compose, `vercel --prod`, `scripts/tenant/*`, `scripts/ops/*` |
-| `hashops-scope.mjs` | PreToolUse `mcp__plugin_hashsmith_hashops__.*` | See §10 |
+| `hashops-scope.mjs` | PreToolUse `mcp__.*` | See §10 |
 | `config-guard.mjs` | PreToolUse Write, Edit on `hashsmith.json` | See §5 |
 | `session-start.mjs` | SessionStart | Loads `reference/conduct.md`, checks the scope, shows what's new since the last version this person saw (stored in `~/.hashsmith/last_seen_version`) |
 
@@ -552,6 +552,15 @@ the edit.
 - Claude Code's memory is stored per directory.
 - Local artefacts (handoff patches, QA screenshots) live under
   `~/.hashsmith/projects/<project_key>/`.
+
+**Least tool access (decided 2026-10-28).** The developer is often a HashOps admin, and the MCP
+offers every tool their permissions allow (about 158, 69 of them writes). `hashops-scope.mjs`
+**denies** every tool on Hashsmith's own connection except the ones its skills name
+(`hooks/hashops-tools.json`, kept equal to the skills by a test). In an onboarded repo it also
+**asks** before a HashOps write through any other connection (for example `peoplemuster`). The
+server-side layer exists too: each HashOps connection has an access level (read only / work /
+full, default work) on the profile's Connected apps card, enforced by the MCP server for every
+client. Hashsmith needs **Work**: every tool it uses is a Work tool.
 
 **Three things are not per-project, and are guarded:**
 1. **The HashOps MCP sees every project the person can see.** `hashops-scope.mjs` reads the tool

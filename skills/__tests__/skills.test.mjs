@@ -63,6 +63,19 @@ describe("skills and agents", () => {
     for (const d of existsSync(vendor) ? readdirSync(vendor) : [])
       for (const f of ["SOURCE.md", "LICENSE"]) assert.ok(existsSync(join(vendor, d, f)), `vendor/${d} needs ${f}`);
   });
+  it("the HashOps allowlist is exactly the tools the skills name", () => {
+    const { hashsmith, writes } = JSON.parse(readFileSync(join(root, "hooks", "hashops-tools.json"), "utf8"));
+    const docs = [
+      ...skillDirs.map(d => join(root, "skills", d, "SKILL.md")),
+      ...readdirSync(join(root, "reference")).map(f => join(root, "reference", f)),
+      ...agentFiles.map(f => join(root, "agents", f)),
+    ].map(f => readFileSync(f, "utf8"));
+    const named = new Set(
+      docs.flatMap(t => [...t.matchAll(/`([a-z]+_[a-z_]+)`/g)].map(m => m[1])).filter(w => writes.includes(w) || hashsmith.includes(w) || /^(get|list|search)_/.test(w)),
+    );
+    for (const tool of named) assert.ok(hashsmith.includes(tool), `a skill uses ${tool}, which hooks/hashops-tools.json does not allow`);
+    for (const tool of hashsmith) assert.ok(named.has(tool), `hooks/hashops-tools.json allows ${tool}, which no skill uses`);
+  });
   it("code-investigator is read-only: no Bash, so text from a source cannot run commands", () => {
     const fm = frontmatter(readFileSync(join(root, "agents", "code-investigator.md"), "utf8"));
     assert.doesNotMatch(fm.tools ?? "", /Bash/);

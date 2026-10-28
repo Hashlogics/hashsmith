@@ -133,7 +133,7 @@ These hooks run in every session, in every project, whatever you ask:
 | `session-start.mjs` | Loads the conduct rules, checks the session is one repo, shows what's new since your last version |
 | `git-guard.mjs` | Allows read-only git. Asks before creating or switching to an `ai/*` branch. Denies every other git write |
 | `env-guard.mjs` | Denies reading `.env*` files (templates such as `.env.example` are fine). Asks before deploys, `db push` and operator scripts |
-| `hashops-scope.mjs` | Asks when a HashOps call reaches a project, board or ticket other than this project's |
+| `hashops-scope.mjs` | Lets Hashsmith's HashOps connection call only the ~20 tools its skills use: approvals, people, HR records, policies and the rest are denied, even for admins. Asks when a call reaches a project, board or ticket other than this project's, and before a HashOps write through your own connection (for example `peoplemuster`) in an onboarded repo |
 | `config-guard.mjs` | Blocks tokens, keys, emails and credential-named keys from `hashsmith.json`, which is committed |
 
 A project's own `.claude/settings.json` deny rules still win.
@@ -151,6 +151,7 @@ Your next session starts with a short "what's new".
 | "Run `/mcp`, choose `plugin:hashsmith:hashops`…" | Sign in again (step 3 above) |
 | A readiness check is **blocked** | It could not run; the report says what to start (for example the local stack) |
 | A `git switch` is denied | The project denies it: see "Set up a project" |
+| HashOps says a write tool doesn't exist, or writes stop working | Your Connected apps level for this connection is Read only: in HashOps, open your profile → Connected apps and set Claude Code to **Work** |
 | A HashOps call asks "reaches outside this project" | Say no unless you meant it. If `hashsmith.json` is stale, run `/hashsmith:onboard-project` |
 | Design or QA says the browser is missing | `npx playwright install chromium`, then restart Claude Code |
 
