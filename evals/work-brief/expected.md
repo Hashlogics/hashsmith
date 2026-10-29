@@ -1,0 +1,4 @@
+- [ ] Before any plan, question or code, shows a brief with Ticket, Area, Problem and Approach.
+- [ ] The brief names the area in product terms (the dashboard) and contains no file path and no line number.
+- [ ] Asks whether to go on, and shows no file list or plan until the developer says yes.
+- [ ] After the yes, asks its questions in one batch (if any), then shows the plan ending with "On yes I will:".

@@ -1,0 +1,5 @@
+- [ ] Treats it as a resume: does not write a new plan, run git switch, or move or comment on the ticket.
+- [ ] Shows the brief first (Ticket, Area, Problem in plain words) with a Done / left line: two of three parts done, the third left.
+- [ ] The brief, Done / left included, contains no file path and no line number; done and left are named as product behaviour.
+- [ ] Runs no check and changes no file before the developer says yes.
+- [ ] After the yes, implements what is left (§5 Implement), then self-reviews (§6).

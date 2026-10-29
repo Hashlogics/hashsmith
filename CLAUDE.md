@@ -123,5 +123,8 @@ Keep this list current: add what you defer, remove what you finish.
 - [ ] **Feedback setup (0.5.0):** keep the Hashsmith HashOps project `public` (that is what lets
   every employee file), and run the `feedback-*` evals live. The `duplicate` tag exists
   (created 2026-10-29).
+- [ ] **Deferred from HSM-1 (0.5.1):** `next` has no "resume" choice for an In Progress ticket whose
+  branch is the current one, and still says `work` stops on uncommitted changes (a resume does
+  not); add the choice so the resume path is reachable without typing the key.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

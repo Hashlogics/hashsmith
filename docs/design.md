@@ -361,8 +361,16 @@ message), with or without their own instructions, and wants tickets.
    1. Read the ticket in full (`get_task` with `full: true`, §14), including the last QA comment
       if it came back from QA.
    2. Read the code.
-   3. Ask clarifying questions.
-   4. Restate the plan and the acceptance criteria, and wait for a yes.
+   3. **Brief** (decided 2026-10-29, HSM-1): the ticket, the area it touches, the problem and the
+      approach in plain words, no paths or line numbers, and wait for a yes. The developer must
+      know what the ticket is before seeing files.
+   4. Ask clarifying questions.
+   5. Restate the plan and the acceptance criteria, and wait for a yes.
+
+   **Resuming** a ticket (In Progress with a "Plan (Hashsmith)" comment) shows the same brief
+   with "Done / left" (the plan against everything since the base branch, committed or not), then
+   continues at implement or self-review. It does not plan, branch or move the ticket again; when
+   the session is not on the ticket's branch, it offers to switch to it.
 3. **Branch.** Check the working tree is clean (§4). Run `git fetch origin` and then
    `git switch -c ai/KEY-12-slug origin/<base_branch>`. The developer approves the `switch`
    prompt.

@@ -4,6 +4,11 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.5.1 — 2026-10-29
+
+- `/hashsmith:work` starts every ticket, new or resumed, with a plain-words brief (the area, the
+  problem, the approach, or what is done and left) and waits for your yes before any plan or code.
+
 ## 0.5.0 — 2026-10-29
 
 - `/hashsmith:feedback <what went wrong>` asks whether each point is a one-off, a rule for this

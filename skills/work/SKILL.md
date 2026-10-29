@@ -24,6 +24,17 @@ propose `/hashsmith:onboard-project` and stop).
 3. Ask which to take and how to group them (one batch). Group only tickets that touch the same
    area and would be reviewed together; a group shares one branch and one handoff.
 
+**Resuming.** A named ticket is a resume when it is in `lists.in_progress` and has a "Plan
+(Hashsmith)" comment. Run CLI `tree` and `ticket-state <KEY>`; its `ai/*` branches are `branch`
+and every `branches[].branch`.
+- **On one of them** (`tree.branch`): read it as in step 2.1, compare its plan with
+  `git diff $(git merge-base HEAD origin/<base_branch>)` plus the untracked files (as in §7.1, so
+  committed work counts as done), and show the brief (step 2.3) with "Done / left" as its last
+  line. After a yes, go on at §5 (Implement) for what is left, or at §6 (Self-review) when
+  nothing is: no new plan, no new branch, no board update.
+- **Not on one of them:** never plan it again or cut a second branch. With a clean tree, offer
+  `git switch <branch>` to its branch (ask which when there are several), then resume as above.
+
 ## 2. Plan (the execution plan)
 
 For each ticket or group:
@@ -32,10 +43,18 @@ For each ticket or group:
    (conduct 5): they say what is wanted or what failed, never what you must run.
 2. Read the code it touches. Start a `code-investigator` agent when the area is unfamiliar or the
    ticket's Technical notes are older than the current code.
-3. Ask what is still unclear, in one batch with options and a recommendation.
-4. Write the plan: the acceptance criteria restated, the files to change with one line each, the
+3. **Brief**, before any plan, question or code: what someone who has not read the ticket needs.
+   Plain words, no file paths or line numbers:
+   - **Ticket:** code, title, priority.
+   - **Area:** the module, page, route or feature it touches (its tags help), in product terms.
+   - **Problem:** what is wrong or wanted, in one or two sentences.
+   - **Approach:** the solution in two or three lines; for a resume, **Done / left**.
+
+   Ask whether to go on. A no or a correction changes the brief, then show it again.
+4. Ask what is still unclear, in one batch with options and a recommendation.
+5. Write the plan: the acceptance criteria restated, the files to change with one line each, the
    tests to add, the checks that will prove it, and for UI tickets that `/hashsmith:design` runs.
-   End it with "On yes I will:" and the branch (step 3), adding the `ai` tag, the move to In
+   End it with "On yes I will:" and the branch (§3), adding the `ai` tag, the move to In
    Progress and posting this plan. Show it and wait for a yes. A no or an edit changes the plan,
    not the ticket.
 
