@@ -4,6 +4,12 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.5.0 — 2026-10-29
+
+- `/hashsmith:feedback <what went wrong>` asks whether each point is a one-off, a rule for this
+  project, for every project, or your preference. Every-project points become tickets on the
+  Hashsmith board's Backlog with you as the reporter; repeats are tagged `duplicate`.
+
 ## 0.4.0 — 2026-10-28
 
 - `/hashsmith:qa` checks tickets in QA on your local app: it switches to the PR branch (you

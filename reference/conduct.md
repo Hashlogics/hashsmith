@@ -31,7 +31,8 @@ commits, pushes or deploys.
     (it asks first) on a clean working tree. Never add, commit, push, stash, reset, restore,
     checkout, merge or rebase; leave changes unstaged for the developer.
 11. **Capture lessons at checkpoints, not mid-task.** At handoff, at sync and at the end of a
-    session, offer in one batch to record any corrections the developer made.
+    session, offer in one batch to record any corrections the developer made. A rule for every
+    project goes to `/hashsmith:feedback`.
 
 Project standards come first: the project's own CLAUDE.md, skills and code patterns decide how
 code looks. Never restructure code to match Hashsmith's fallback standards.

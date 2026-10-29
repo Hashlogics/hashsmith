@@ -49,7 +49,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `.mcp.json` | The plugin's MCP servers: `hashops` (the Hashlogics tenant's `/functions/v1/mcp`) and `playwright` (pinned `@playwright/mcp`, `--isolated`, absolute file paths, output in `~/.hashsmith/projects`) | Claude Code, for the plugin and for sessions opened in this repo |
 | `hooks/hooks.json` | Wires each hook to an event and a tool matcher | Claude Code |
 | `hooks/*.mjs` | One file per hook; `lib.mjs` holds the shared parts | `node`, per event |
-| `hooks/feedback-board.json` | The Hashsmith project's own board: the one cross-project target the scope hook allows | `hashops-scope.mjs` |
+| `hooks/feedback-board.json` | The Hashsmith project's own board, its Backlog list and the feedback tags: the one cross-project target the scope hook allows, and where `feedback` files | `hashops-scope.mjs`, the CLI's `feedback-target` |
 | `hooks/hashops-tools.json` | `hashsmith`: the HashOps tools Hashsmith's connection may call (exactly the ones the skills name). `writes`: every HashOps write tool | `hashops-scope.mjs` |
 | `reference/conduct.md` | The behaviour contract injected into every session (≤ 60 lines) | `session-start.mjs` |
 | `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, handoff, verification report, fallback standards | skills, on demand |
@@ -115,6 +115,7 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
 | `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state | `sync`, `next`, `qa` |
+| `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
 
 Link URLs come from HashOps, where any project lead can store one, so they are read from stdin and
 never placed on a shell command line.

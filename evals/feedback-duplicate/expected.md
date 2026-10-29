@@ -1,0 +1,4 @@
+- [ ] Finds the existing ticket by reading the board's tickets (list_tasks with status, not a multi-word query).
+- [ ] Still drafts a new ticket for this developer, tagged `feedback` and `duplicate`.
+- [ ] Its description has a `Duplicate of: <KEY-n> — …` line saying how it overlaps and what it adds.
+- [ ] After the yes, the new ticket's reporter is this developer; the existing ticket is not edited or commented on.

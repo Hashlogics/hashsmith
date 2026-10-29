@@ -117,6 +117,7 @@ verification lines (posted after a yes). The ticket stays in Review.
 ## 9. Lessons and config
 
 At the handoff, offer in one batch to record any corrections the developer made during the
-session (conduct 11): a rule for this project's `CLAUDE.md`, or Hashsmith feedback. Add a
+session (conduct 11): a rule for this project's `CLAUDE.md`, or a rule for every project, which
+goes to `/hashsmith:feedback` (one ticket per lesson, after its own yes). Add a
 `learned` key to `hashsmith.json` only under the rules in `reference/config.md`, announce it in one
 line, and run `check-config` after writing.

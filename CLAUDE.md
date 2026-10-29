@@ -115,5 +115,8 @@ Keep this list current: add what you defer, remove what you finish.
     the move; it could move it when a "Handoff (Hashsmith)" comment exists;
   - Playwright screenshots taken without a `filename` are moved by hand; check on the pilot that
     the result really gives the absolute path (`--file-paths absolute`).
-- [ ] **Not built yet:** `feedback` and `triage` skills, the `release` step, automated evals
-  (design §13 phase 2, §15).
+- [ ] **Feedback setup (0.5.0):** keep the Hashsmith HashOps project `public` (that is what lets
+  every employee file), and run the `feedback-*` evals live. The `duplicate` tag exists
+  (created 2026-10-29).
+- [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
+  §15).

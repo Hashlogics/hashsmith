@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "hashops": {
+    "project_id": "2c9f7cfd-be3c-49f5-8661-e0b59f9161b3",
+    "project_key": "HSM",
+    "board_id": "3dea74ea-5fd0-41ea-8e16-023354d1d477",
+    "lists": {
+      "todo": "bb022509-27e9-498b-88d9-cb0deb2f7b41",
+      "in_progress": "e78d351e-9295-41f9-b536-46bcae920ebe",
+      "review": "90640fd1-f5be-46a1-88cb-4dcbfd09baee",
+      "qa": "5010e787-8f9d-420d-86fb-02b2761f5fa5",
+      "done": "e480d208-9847-414f-82bc-40df979568dd"
+    },
+    "ai_tag": "ai"
+  },
+  "repo": {
+    "base_branch": "main"
+  }
+}

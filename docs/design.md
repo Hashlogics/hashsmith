@@ -456,6 +456,15 @@ most three rounds. It reports the sources used, the screenshots and the gaps lef
 **Use when:** the developer says Hashsmith got something wrong or could do better, or at a
 checkpoint where corrections were captured. See §12.
 
+1. `feedback-target` (CLI) gives the board, the Backlog list, the tags and the plugin version.
+2. Split what the developer said (or the lessons `work`/`sync` hand over) into one point per gap,
+   and ask each point's scope (§12, "one question per lesson"); checkpoint lessons already have
+   one. Only "every project" points become tickets; the others are edits after a yes.
+3. For each, find the skill and step, and quote the plugin's own lines for a before/after.
+4. Check the Hashsmith board for duplicates; a match is still filed, tagged `duplicate` (§12).
+5. Draft in general terms (`reference/feedback-template.md`), show, and after a yes `create_task`
+   in Backlog. HashOps makes the developer the reporter. No HashOps: a local file instead.
+
 ## 7. Ticket template
 
 `reference/ticket-template.md`.
@@ -641,6 +650,22 @@ The Hashsmith repo is onboarded like any other project. It has its own HashOps p
 `hashsmith.json`. A "rule for every project" lesson becomes a ticket on that board with the
 `feedback` tag. This board is the scope hook's one allowed cross-project target.
 
+**Decided 2026-10-29:**
+- **The sender is the reporter.** `create_task` always makes the caller the reporter, so filing
+  through the developer's own Hashsmith connection records who sent it, with no HashOps change.
+  This works for every employee because the Hashsmith project's visibility is `public`:
+  `is_project_member` is true for everyone on a public project, which is what the `project_tasks`
+  insert policy and the board read check. Keep the project public; if it ever becomes private,
+  every Hashsmith user must be added as a member, or filing fails. The body carries no name.
+- **New tickets go to Backlog**, not To Do: the maintainer triages them before they become work.
+  No assignee.
+- **One ticket per point, duplicates included.** A report matching an existing ticket is still
+  filed (so its sender is its reporter) with the `duplicate` tag and a `Duplicate of:` line saying
+  how it overlaps and what it adds. The maintainer merges them; five reports about one gap still
+  become one change.
+- **The ids live in `hooks/feedback-board.json`** (project, board, Backlog list, tags), read by
+  the scope hook and by the CLI's `feedback-target`, which also gives the plugin version.
+
 The report (`reference/feedback-template.md`):
 
 ```
@@ -766,8 +791,9 @@ mirrors the app's form and RLS; edits and deletes stay in the app.
 | 4 | `qa`, `triage` | QA runs on real tickets; one production bug triaged end to end |
 | 5 | A second project via `onboard-project`; automated evals | Hashsmith works in a project it was not built in |
 
-Releases so far: 0.2.0 shipped phase 1, 0.3.0 phase 2 plus `next` and `design`, and 0.4.0 `qa`
-from phase 4. `feedback`, `release` and `triage` are still to come.
+Releases so far: 0.2.0 shipped phase 1, 0.3.0 phase 2 plus `next` and `design`, 0.4.0 `qa`
+from phase 4, and 0.5.0 `feedback` and the Hashsmith board from phase 3. `release` and `triage`
+are still to come.
 
 ## 16. Decisions on the former open questions (2026-10-27)
 
@@ -778,8 +804,8 @@ from phase 4. `feedback`, `release` and `triage` are still to come.
    `create_project_tag`, `create_board_list` and `add_project_link` exist, and onboarding uses them.
 4. **QA evidence** gets attachment tools (H2).
 5. **Test users** come from `dev:local-users` (H4).
-6. **Feedback tickets** stay as they are for now. Anyone with access to the Hashsmith project can
-   see and pick them up; revisit once there is real volume.
+6. **Feedback tickets** stay as they are for now. The Hashsmith project is public, so anyone can
+   see them and file them (§12); revisit once there is real volume.
 
 ---
 

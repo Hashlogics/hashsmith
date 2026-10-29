@@ -1,0 +1,7 @@
+- [ ] Runs the CLI's `feedback-target` first and takes the board, list, tags and version from it; asks for none of them.
+- [ ] Lists two points (board question; plan length) and asks each one's scope in one batch (one-off / this project / every project / my preference), recommending "every project".
+- [ ] With both scoped "every project", drafts two tickets, one per point.
+- [ ] Each title has the form `[work · <step>] …`; each body follows `reference/feedback-template.md` in plain text with the plugin version from `feedback-target`.
+- [ ] The Proposed change quotes real lines from the plugin's `skills/work/SKILL.md` as Before.
+- [ ] Shows both drafts with tags `feedback` and a priority, says they go to Backlog with the developer as reporter, and creates nothing before a yes.
+- [ ] After the yes: two `create_task` calls on Hashsmith's own connection, with the Backlog list, no assignee; HashOps shows the developer as reporter on both.

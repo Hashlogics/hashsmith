@@ -1,6 +1,9 @@
 {
-  "_comment": "The Hashsmith project's feedback board: the one cross-project HashOps target the scope hook allows (design §10, §12). An empty value means no exception for that field.",
+  "_comment": "The Hashsmith project's feedback board: the one cross-project HashOps target the scope hook allows (design §10, §12), and where /hashsmith:feedback files (the CLI's feedback-target). The project is public in HashOps, so every employee can create tasks on it and is the reporter of what they file. list_id is the Backlog list. An empty project_id or board_id means no scope exception for that field.",
   "project_id": "2c9f7cfd-be3c-49f5-8661-e0b59f9161b3",
   "board_id": "3dea74ea-5fd0-41ea-8e16-023354d1d477",
-  "project_key": "HSM"
+  "project_key": "HSM",
+  "list_id": "c2e82a48-33f5-4693-96fa-ac6d590902ff",
+  "tags": ["feedback"],
+  "duplicate_tag": "duplicate"
 }

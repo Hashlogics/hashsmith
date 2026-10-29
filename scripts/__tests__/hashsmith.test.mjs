@@ -9,6 +9,7 @@ import {
   branchesForKey,
   checkConfig,
   envKeyNames,
+  feedbackTarget,
   gitSwitchRule,
   missingEnvKeys,
   repoSlug,
@@ -185,7 +186,36 @@ describe("branches and ticket state", () => {
   });
 });
 
+describe("feedbackTarget", () => {
+  const board = { _comment: "x", project_id: U(1), board_id: U(2), project_key: "hsm", list_id: U(3), tags: ["feedback"], duplicate_tag: "duplicate" };
+  it("returns the board, list, tags and plugin version, without the comment", () => {
+    assert.deepEqual(feedbackTarget(board, { version: "0.5.0" }), {
+      ok: true,
+      version: "0.5.0",
+      project_id: U(1),
+      board_id: U(2),
+      project_key: "HSM",
+      list_id: U(3),
+      tags: ["feedback"],
+      duplicate_tag: "duplicate",
+    });
+  });
+  it("names every missing or malformed field", () => {
+    const r = feedbackTarget({ ...board, board_id: "", list_id: "nope", tags: [] }, {});
+    assert.equal(r.ok, false);
+    for (const f of ["board_id", "list_id", "tags", "version"]) assert.ok(r.errors.some(e => e.includes(f)), f);
+  });
+  it("rejects a missing file", () => assert.equal(feedbackTarget(null, { version: "1.0.0" }).ok, false));
+});
+
 describe("CLI", () => {
+  it("feedback-target reads the plugin's own board file and version", () => {
+    const r = spawnSync(process.execPath, [CLI, "feedback-target"], { cwd: tmpdir(), encoding: "utf8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.ok, true, r.stdout);
+    assert.match(out.version, /^\d+\.\d+\.\d+$/);
+  });
   it("env-keys prints missing names and never a value", () => {
     const dir = mkdtempSync(join(tmpdir(), "hashsmith-cli-"));
     writeFileSync(join(dir, ".env.example"), "A=\nB=\n");

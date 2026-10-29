@@ -20,8 +20,8 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.4.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`). Next:
-`feedback` and `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
+**Status: 0.5.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+`feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
 
@@ -67,7 +67,7 @@ review every change and do the commit, the push and the PR yourself.
    access. You need this even if you already connected HashOps another way (for example
    `peoplemuster` from the in-app Connect dialog): Hashsmith has its own connection, so that its
    project guard applies. Keep the other one for your own use.
-4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.4.0`.
+4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.5.0`.
 
 Optional tools you install yourself (Hashsmith does not declare them, so you never run two
 copies): a SonarQube MCP server (issues on changed files during self-review) and the official
@@ -109,6 +109,7 @@ always just say what you want instead.
 | `/hashsmith:sync` | Moves tickets to match git, after your yes: Review → QA once the PR is open |
 | `/hashsmith:design` | Designs or polishes a screen. Your project's design rules come first, then your own, then Hashsmith's taste kit. It takes screenshots at desktop and mobile widths and does up to three critique rounds. `work` runs it for UI tickets |
 | `/hashsmith:qa [KEY-12]` | On your local app only: switches to the PR branch (you approve) and logs in as the right test user. Then it runs each acceptance criterion with screenshots attached to the ticket, and moves the ticket to Done or back to To Do with the failing steps |
+| `/hashsmith:feedback [what went wrong]` | Files one ticket per point on the Hashsmith board's Backlog, with you as the reporter, after your yes. Written in general terms (no client, project or code specifics), with a concrete before/after edit to the skill. Works in any repo |
 | `/hashsmith:onboard-project` | Set up or refresh the project's `hashsmith.json` |
 
 ### A ticket's life
@@ -157,8 +158,11 @@ Your next session starts with a short "what's new".
 
 ## Feedback
 
-Tell the maintainer what Hashsmith got wrong. A later release adds `/hashsmith:feedback`, which files
-it for you from inside the session.
+Run `/hashsmith:feedback <what went wrong>` in the session where it happened, while the context is
+still there. Each point becomes a ticket on the Hashsmith board (Backlog, tag `feedback`) with you
+as the reporter; a point someone already reported is still filed, tagged `duplicate` and linked to
+the first one. `work` and `sync` also offer it at their checkpoints. Without HashOps, the report
+is saved to `~/.hashsmith/feedback/` for you to hand to the maintainer.
 
 ## Working on Hashsmith itself
 

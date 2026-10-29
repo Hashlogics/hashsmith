@@ -9,8 +9,10 @@
 //   check-config         validate hashsmith.json (exit 1 when invalid)
 //   tree                 working-tree state and current branch
 //   ticket-state KEY...  each ticket's ai/* branch (local or on origin) and PR, mapped to the design §4 states
+//   feedback-target      the Hashsmith feedback board, list and tags, and the plugin version (exit 1 when invalid)
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { isMain } from "../hooks/lib.mjs";
 
 // Hosts whose repos are always owner/repo, so anything after that is a web page within the repo.
@@ -127,6 +129,22 @@ export function checkConfig(c) {
       }
   }
   return e;
+}
+
+/** Where /hashsmith:feedback files its tickets (hooks/feedback-board.json) and the plugin version
+ *  the report names (design §12). Upper-cases the key; errors name each bad field. */
+export function feedbackTarget(board, plugin) {
+  if (!isObj(board)) return { ok: false, errors: ["hooks/feedback-board.json is missing or not a JSON object."] };
+  const e = [];
+  for (const k of ["project_id", "board_id", "list_id"]) if (!UUID.test(board[k] ?? "")) e.push(`feedback-board.json ${k} must be a UUID.`);
+  if (!/^[A-Za-z0-9]+$/.test(board.project_key ?? "")) e.push("feedback-board.json project_key must be letters and digits.");
+  if (!Array.isArray(board.tags) || !board.tags.length || !board.tags.every(t => isStr(t) && t.trim()))
+    e.push("feedback-board.json tags must be a non-empty array of tag names.");
+  if (!isStr(board.duplicate_tag) || !board.duplicate_tag.trim()) e.push("feedback-board.json duplicate_tag must be a tag name.");
+  if (!/^\d+\.\d+\.\d+$/.test(plugin?.version ?? "")) e.push("plugin.json version must be x.y.z.");
+  if (e.length) return { ok: false, errors: e };
+  const { project_id, board_id, list_id, tags, duplicate_tag } = board;
+  return { ok: true, version: plugin.version, project_id, board_id, project_key: board.project_key.toUpperCase(), list_id, tags, duplicate_tag };
 }
 
 /** The ai/* branches carrying this ticket key in their leading key segment: ai/KEY-12-KEY-15-slug
@@ -249,6 +267,12 @@ const COMMANDS = {
     }
     return out;
   },
+  // The plugin's own files, wherever the CLI runs from: feedback is filed from any repo.
+  "feedback-target": () =>
+    feedbackTarget(
+      tryJson(fileURLToPath(new URL("../hooks/feedback-board.json", import.meta.url))),
+      tryJson(fileURLToPath(new URL("../.claude-plugin/plugin.json", import.meta.url))),
+    ),
 };
 
 if (isMain(import.meta.url)) {
@@ -259,6 +283,6 @@ if (isMain(import.meta.url)) {
   }
   const result = COMMANDS[cmd](args);
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  if (cmd === "check-config" && !result.ok) process.exit(1);
+  if ((cmd === "check-config" || cmd === "feedback-target") && !result.ok) process.exit(1);
   if (result?.error) process.exit(2);
 }

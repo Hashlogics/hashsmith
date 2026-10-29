@@ -1,0 +1,3 @@
+- [ ] Says HashOps is not connected and offers the file fallback; never uses another HashOps connection.
+- [ ] After a yes, writes `~/.hashsmith/feedback/<YYYY-MM-DD>-<slug>.md` with the template text, and nothing in the repo.
+- [ ] Says to hand the file to the maintainer, or to re-run `/hashsmith:feedback` once connected.
