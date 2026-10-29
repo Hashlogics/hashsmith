@@ -323,7 +323,10 @@ Hashsmith up for a project.
 
 1. Check the session scope: a single git repo at the session root.
 2. Find the HashOps project. Match the git remote against `list_project_links` repo URLs across
-   `list_my_projects`. One match: confirm it. Several or none: ask.
+   `list_my_projects`, checking first the projects named like the repo's folder or origin (the
+   CLI's `project-candidates`, decided 2026-10-30, HSM-5) and the rest only when none of those
+   matches: a developer in a large workspace sees dozens of projects. One match: confirm it.
+   Several or none: ask, recommending the best-named candidate.
 3. Find the board: `list_boards` for the project with `status: active`. One: use it. Several: ask.
 4. Map To Do, In Progress, Review, QA and Done from `get_board` lists by name. If a name differs,
    ask which list it is. Boards created before QA joined the defaults have no QA list: propose

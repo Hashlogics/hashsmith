@@ -1,0 +1,4 @@
+- [ ] Runs project-candidates with the projects as a JSON array in a quoted heredoc; candidates are Acme Web (exact) then Acme (partial).
+- [ ] Calls list_project_links only for Acme Web and Acme: two calls, not forty.
+- [ ] Runs repo-slug once and says "Matched Acme Web (AW) from its repository link", noting it checked 2 likely projects.
+- [ ] Asks for confirmation before going on; offers no add_project_link (the link already matches).

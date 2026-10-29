@@ -36,15 +36,22 @@ If `hashsmith.json` exists, this run is a **refresh**:
 1. Call `list_my_projects`. If the call fails for authentication or the tool does not exist, stop:
    "Run `/mcp`, choose `plugin:hashsmith:hashops`, Authenticate, then Approve on the HashOps page.
    Then run `/hashsmith:onboard-project` again." Write nothing.
-2. For every project, call `list_project_links` with `{project_id, limit: 50}` and keep the
-   `repository` links. Pass all their URLs to one CLI call as a JSON array on stdin, through a
-   quoted heredoc so no URL is ever on the command line:
-   `node "<cli>" repo-slug <<'EOF'` / `["https://…", "https://…"]` / `EOF`. It prints `origin`
-   (this repo), a slug per URL, and `matches`: the URLs that are this repo.
-3. Exactly one project has a URL in `matches`: say "Matched <name> (<key>) from its repository
-   link" and confirm it. None or several: ask, listing each candidate as `Name (KEY)`,
-   recommending the closest name to the repo.
-4. If the chosen project has no link in `matches` and `origin` is not null, offer
+2. **Candidates first.** Pass the projects (`id`, `name`, `key` of each row) to the CLI's
+   `project-candidates` as a JSON array on stdin, through a quoted heredoc so no name is ever on
+   the command line: `node "<cli>" project-candidates <<'EOF'` / `[{"id": …}, …]` / `EOF`. It
+   prints `candidates`: up to five projects named like this repo's folder or origin, best first.
+3. For each candidate, call `list_project_links` with `{project_id, limit: 50}` and keep the
+   `repository` links. Pass all their URLs to one CLI call as a JSON array on stdin, in the same
+   way: `node "<cli>" repo-slug <<'EOF'` / `["https://…", "https://…"]` / `EOF`. It prints
+   `origin` (this repo), a slug per URL, and `matches`: the URLs that are this repo. When no
+   candidate's link is in `matches` (or there are no candidates), do the same once more for the
+   projects not checked yet. Say which round matched ("checked 2 likely projects, then the other
+   39").
+4. Exactly one project has a URL in `matches`: say "Matched <name> (<key>) from its repository
+   link" and confirm it. Several: ask which, listing them as `Name (KEY)`. None: ask, listing
+   `candidates` as `Name (KEY)` with the first recommended, or another project's name or key
+   (with no candidates, ask only for that). A CLI `error`: show it, fix the input, run it again.
+5. If the chosen project has no link in `matches` and `origin` is not null, offer
    `add_project_link` with `type: "repository"` and `https://<origin>`, so the next onboarding
    matches by itself. When `origin` is null (no remote, or an SSH host alias), ask the developer
    for the repository's web URL instead.

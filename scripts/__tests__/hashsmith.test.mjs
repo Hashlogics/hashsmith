@@ -20,8 +20,7 @@ import * as cli from "../hashsmith.mjs";
 
 const CLI = fileURLToPath(new URL("../hashsmith.mjs", import.meta.url));
 // A git repo without running a git write: the minimal .git layout git status accepts.
-function fixtureRepo(config = "") {
-  const dir = mkdtempSync(join(tmpdir(), "hashsmith-repo-"));
+function fixtureRepo(config = "", dir = mkdtempSync(join(tmpdir(), "hashsmith-repo-"))) {
   for (const d of [".git/objects", ".git/refs/heads"]) mkdirSync(join(dir, d), { recursive: true });
   writeFileSync(join(dir, ".git/HEAD"), "ref: refs/heads/main\n");
   writeFileSync(join(dir, ".git/config"), `[core]\n\trepositoryformatversion = 0\n\tbare = false\n${config}`);
@@ -70,6 +69,46 @@ describe("repoMatches", () => {
   it("never matches when the origin is missing or unparsable", () => {
     assert.deepEqual(cli.repoMatches(null, ["nope", "https://github.com/org/app"]), []);
     assert.deepEqual(cli.repoMatches("nope", ["nope"]), []);
+  });
+});
+
+describe("project candidates", () => {
+  const P = (n, name, key) => ({ id: U(n), name, key });
+  it("probes are the folder name and the origin's repo name, normalised and deduplicated", () => {
+    assert.deepEqual(cli.repoProbes("Acme_Web", "git@github.com:Org/acme-web.git"), ["acmeweb"]);
+    assert.deepEqual(cli.repoProbes("checkout", "https://gitlab.com/org/sub/Billing.git"), ["checkout", "billing"]);
+    assert.deepEqual(cli.repoProbes("app", null), ["app"]);
+    assert.deepEqual(cli.repoProbes("", "nope"), ["nope"]);
+    assert.deepEqual(cli.repoProbes("x", "github-work:Org/Acme-Web.git"), ["x", "acmeweb"]); // SSH host alias
+    assert.deepEqual(cli.repoProbes("", null), []);
+  });
+  it("ranks exact name or key matches first, ignoring case, -, _, spaces and dots", () => {
+    const projects = [P(1, "Acme Portal", "ACP"), P(2, "acme.web", "AW"), P(3, "Billing", "ACMEWEB"), P(4, "Other", "OTH")];
+    assert.deepEqual(
+      cli.projectCandidates(projects, ["acmeweb"]).map(c => [c.name, c.match]),
+      [["acme.web", "exact"], ["Billing", "exact"]],
+    );
+  });
+  it("adds partial matches after the exact ones, closest first, only when the shorter side has 4+ characters", () => {
+    const projects = [P(1, "Acme", "ACM"), P(2, "Acme Web Admin", "AWA"), P(3, "Acme Web", "AW"), P(4, "App", "APP")];
+    assert.deepEqual(
+      cli.projectCandidates(projects, ["acmeweb"]).map(c => [c.name, c.match]),
+      [["Acme Web", "exact"], ["Acme", "partial"], ["Acme Web Admin", "partial"]],
+    );
+    assert.deepEqual(cli.projectCandidates(projects, ["app"]).map(c => c.name), ["App"]); // "app" is in no other name, and too short for partial
+    assert.deepEqual(cli.projectCandidates([P(1, "Ops", "OPS"), P(2, "Hashops", "HOPS")], ["hashops"]).map(c => c.name), ["Hashops"]);
+  });
+  it("returns at most five, and skips rows without an id or a name", () => {
+    const many = Array.from({ length: 8 }, (_, i) => P(i + 1, `Acme ${i}`, `A${i}`));
+    assert.equal(cli.projectCandidates(many, ["acme"]).length, 5);
+    assert.deepEqual(cli.projectCandidates([{ name: "Acme" }, { id: U(1) }, null, "Acme"], ["acme"]), []);
+    assert.deepEqual(cli.projectCandidates("not an array", ["acme"]), []);
+    assert.deepEqual(cli.projectCandidates([P(1, "Acme", "ACM")], []), []);
+  });
+  it("keeps id, name and key as given; a missing or non-string key matches nothing", () => {
+    assert.deepEqual(cli.projectCandidates([P(7, "Acme Web", "AW")], ["acmeweb"]), [{ id: U(7), name: "Acme Web", key: "AW", match: "exact" }]);
+    assert.deepEqual(cli.projectCandidates([{ id: U(8), name: "Acme Web" }], ["acmeweb"]), [{ id: U(8), name: "Acme Web", key: null, match: "exact" }]);
+    assert.deepEqual(cli.projectCandidates([P(9, "Other", null), P(10, "Else", 5)], ["5", "other"]).map(c => c.name), ["Other"]);
   });
 });
 
@@ -300,6 +339,28 @@ describe("CLI", () => {
     const out = JSON.parse(r.stdout);
     assert.equal(out.origin, "github.com/org/app");
     assert.deepEqual(out.matches, ["https://github.com/org/app/tree/dev"]);
+  });
+  it("project-candidates reads the projects on stdin and probes the folder and origin names", () => {
+    const parent = mkdtempSync(join(tmpdir(), "hashsmith-cand-"));
+    const dir = fixtureRepo('[remote "origin"]\n\turl = git@github.com:Org/acme-billing.git\n', join(parent, "acme-web"));
+    const projects = [
+      { id: U(1), name: "Acme Web", key: "AW" },
+      { id: U(2), name: "Acme Billing", key: "AB" },
+      { id: U(3), name: "$(touch pwned) Acme", key: "X" },
+    ];
+    const r = spawnSync(process.execPath, [CLI, "project-candidates"], { cwd: dir, encoding: "utf8", input: JSON.stringify(projects) });
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.deepEqual(out.probes, ["acmeweb", "acmebilling"]);
+    assert.deepEqual(out.candidates.map(c => c.key), ["AW", "AB"]);
+    mkdirSync(join(dir, "sub"));
+    const fromSub = spawnSync(process.execPath, [CLI, "project-candidates"], { cwd: join(dir, "sub"), encoding: "utf8", input: "[]" });
+    assert.deepEqual(JSON.parse(fromSub.stdout).probes, ["acmeweb", "acmebilling"], "probes the repo's top folder, not the cwd");
+    for (const bad of ["not json", '{"data": []}']) {
+      const r2 = spawnSync(process.execPath, [CLI, "project-candidates"], { cwd: dir, encoding: "utf8", input: bad });
+      assert.equal(r2.status, 2, bad);
+      assert.match(JSON.parse(r2.stdout).error, /JSON array/);
+    }
   });
   it("ticket-state reports a key with no branch and no commits as no-branch, with the base it searched", () => {
     const dir = fixtureRepo();

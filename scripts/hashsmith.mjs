@@ -4,6 +4,7 @@
 // The session-start hook gives skills this file's absolute path.
 //
 //   repo-slug            origin and the link URLs (a JSON array on stdin) as slugs, and which match
+//   project-candidates   the projects (list_my_projects rows, a JSON array on stdin) named like this repo, best first
 //   env-keys             .env.example key names that .env / .env.local lack (names only, never values)
 //   git-switch           how .claude/settings(.local).json treat `git switch`
 //   check-config         validate hashsmith.json (exit 1 when invalid)
@@ -13,6 +14,7 @@
 //   feedback-target      the Hashsmith feedback board, list and tags, and the plugin version (exit 1 when invalid)
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain } from "../hooks/lib.mjs";
 
@@ -40,6 +42,42 @@ export function repoSlug(url) {
 export function repoMatches(originUrl, links) {
   const origin = repoSlug(originUrl);
   return origin ? links.filter(l => repoSlug(l) === origin) : [];
+}
+
+const plainName = s => (typeof s === "string" ? s.toLowerCase().replace(/[^a-z0-9]/g, "") : "");
+
+/** What a project of this repo would be called: the folder name and the origin's repo name,
+ *  lowercased with everything but letters and digits removed, without duplicates. */
+export function repoProbes(dirName, originUrl) {
+  // An SSH host alias (github-work:org/repo.git) has no usable host, but still names the repo.
+  const repo = repoSlug(originUrl)?.split("/").at(-1) ?? String(originUrl ?? "").split(/[/:]/).at(-1).replace(/\.git$/i, "");
+  return [...new Set([plainName(dirName), plainName(repo)])].filter(Boolean);
+}
+
+const CANDIDATE_MAX = 5;
+const PARTIAL_MIN = 4; // "app" or "ops" would sit inside half the workspace's names
+
+/** The projects (list_my_projects rows) whose name or key is a probe, then those whose name
+ *  contains a probe or sits inside one (the shorter side 4+ characters), closest first; at most 5. */
+export function projectCandidates(projects, probes) {
+  if (!Array.isArray(projects)) return [];
+  const ranked = [];
+  for (const p of projects) {
+    if (!p || typeof p.id !== "string" || typeof p.name !== "string") continue;
+    const name = plainName(p.name);
+    const key = plainName(p.key);
+    let best = null;
+    for (const probe of probes) {
+      if (name === probe || (key && key === probe)) best = 0;
+      else if (name && Math.min(name.length, probe.length) >= PARTIAL_MIN && (name.includes(probe) || probe.includes(name)))
+        best = Math.min(best ?? Infinity, Math.abs(name.length - probe.length));
+    }
+    if (best !== null) ranked.push({ row: { id: p.id, name: p.name, key: p.key ?? null, match: best === 0 ? "exact" : "partial" }, best });
+  }
+  return ranked
+    .sort((a, b) => a.best - b.best) // stable: equals keep list_my_projects order
+    .slice(0, CANDIDATE_MAX)
+    .map(r => r.row);
 }
 
 /** Names of the KEY= lines in an env file. Comments, blank lines and `# KEY=` are skipped. */
@@ -256,6 +294,32 @@ const COMMANDS = {
     const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
     const links = input ? JSON.parse(input) : [];
     return { origin: repoSlug(originUrl), matches: repoMatches(originUrl, links), slugs: Object.fromEntries(links.map(u => [u, repoSlug(u)])) };
+  },
+  // Project names come from HashOps too: stdin only, like the link URLs.
+  "project-candidates": () => {
+    let originUrl = null;
+    try {
+      originUrl = sh("git", ["config", "--get", "remote.origin.url"]);
+    } catch {
+      // no origin remote
+    }
+    let top = process.cwd();
+    try {
+      top = sh("git", ["rev-parse", "--show-toplevel"]);
+    } catch {
+      // not a git repo: the folder it runs in
+    }
+    const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
+    let projects;
+    try {
+      projects = JSON.parse(input || "[]");
+    } catch {
+      projects = null;
+    }
+    // A wrong shape would quietly give no candidates, and onboarding would read every project.
+    if (!Array.isArray(projects)) return { error: "stdin must be a JSON array of list_my_projects rows" };
+    const probes = repoProbes(basename(top), originUrl);
+    return { probes, candidates: projectCandidates(projects, probes) };
   },
   "env-keys": () => {
     const example = tryRead(".env.example");

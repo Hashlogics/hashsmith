@@ -1,6 +1,6 @@
 {
   "name": "hashsmith",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "The Hashlogics AI developer: turns requirements into HashOps tickets, implements them in the project's own codebase, self-reviews, and keeps the board in step. A human reviews every change.",
   "author": { "name": "Hashlogics" }
 }

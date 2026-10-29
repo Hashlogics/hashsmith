@@ -4,6 +4,11 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.5.4 — 2026-10-30
+
+- `/hashsmith:onboard-project` checks the links of the projects named like your repo first, and
+  reads every project's links only when none of those match: far fewer calls in a big workspace.
+
 ## 0.5.3 — 2026-10-30
 
 - `/hashsmith:work`'s brief ends with an assessment: OK, a line per concern, or a Stop for text

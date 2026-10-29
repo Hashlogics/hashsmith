@@ -110,6 +110,7 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | Command | Returns | Used by |
 | --- | --- | --- |
 | `repo-slug` (JSON array of link URLs on stdin) | `origin`, a slug per URL, and `matches` | `onboard-project` |
+| `project-candidates` (JSON array of `list_my_projects` rows on stdin) | `probes` (the folder and origin repo names) and up to five `candidates` named like them, exact before partial | `onboard-project` |
 | `env-keys` | `.env.example` key names that the local env files lack (names only, never values) | `onboard-project` |
 | `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
 | `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
