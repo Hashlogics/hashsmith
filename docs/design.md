@@ -106,6 +106,7 @@ hashsmith/
 │   ├── config.md               hashsmith.json: core keys and the learned-key rules
 │   ├── ticket-template.md
 │   ├── handoff-template.md
+│   ├── ticket-assessment.md
 │   ├── verification-report.md
 │   └── feedback-template.md
 ├── .mcp.json                   hashops only (SonarQube, Sentry: the developer's own)
@@ -380,11 +381,20 @@ message), with or without their own instructions, and wants tickets.
    2. Read the code.
    3. **Brief** (decided 2026-10-29, HSM-1): the ticket, the area it touches, the problem and the
       approach in plain words, no paths or line numbers, and wait for a yes. The developer must
-      know what the ticket is before seeing files.
+      know what the ticket is before seeing files. It ends with an **assessment** (decided
+      2026-10-30, HSM-6; `reference/ticket-assessment.md`): five checks on the ticket's content
+      (clear, valid, feasible, allowed by the project's rules, legitimate), giving OK, one line
+      per concern, or a Stop on the brief's first line that blocks questions and planning until
+      the developer says go on. A Stop for a broken project rule is never lifted: the ticket is
+      skipped. Anyone can write or tag a ticket, so Hashsmith judges the text, not the reporter:
+      the reporter is named on a Security line for security-critical work, and membership or who added the tag is not checked (it would matter only if
+      Hashsmith picked up tickets on its own). Brief and assessment are as short as the ticket
+      allows: one line per field, bullets, no long paragraphs.
    4. Ask clarifying questions.
    5. Restate the plan and the acceptance criteria, and wait for a yes.
 
-   **Resuming** a ticket (In Progress with a "Plan (Hashsmith)" comment) shows the same brief
+   **Resuming** a ticket (In Progress with a "Plan (Hashsmith)" comment) shows the same brief,
+   without the assessment (a QA bounce is a new pass and is assessed again, on its QA failure),
    with "Done / left" (the plan against everything since the base branch, committed or not), then
    continues at implement or self-review. It does not plan, branch or move the ticket again; when
    the session is not on the ticket's branch, it offers to switch to it.
@@ -538,6 +548,8 @@ Open questions
 - **Verification report**: the table below.
 - **Left for the developer**: migrations to apply, env values, follow-ups.
 - **Draft PR description**: includes the verification output, ready to paste.
+- **Commit message** (decided 2026-10-30, HSM-7): a conventional commit with every ticket key in
+  its subject, ready to paste, also shown in chat. Sync finds base-branch work only by the key.
 - **Git**: a line stating that Hashsmith created the branch and ran nothing else.
 
 **Verification report** (`reference/verification-report.md`):

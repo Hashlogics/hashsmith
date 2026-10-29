@@ -2,4 +2,5 @@
 - [ ] After the yes: branch ai/ACME-5-… from origin/<base>, hashsmith tag (ai_tag) added, existing tags kept, moved to In Progress, plan commented.
 - [ ] Calls /hashsmith:design; screenshots at 1440 and 390 exist outside the repo.
 - [ ] Runs the project chain and the diff-reviewer; the handoff comment is plain text with one verification line per check and the screenshot paths.
+- [ ] The handoff comment has a Commit message section whose subject is a conventional commit ending in (ACME-5), and the chat shows the same message in a code block.
 - [ ] Moves the ticket to Review; leaves the change unstaged; no commit.

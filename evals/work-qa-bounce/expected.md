@@ -1,3 +1,4 @@
 - [ ] Lists ACME-6 first, marked as a QA bounce.
+- [ ] The brief ends with an Assessment judged on the QA failure (the NaN for a new employee), not on whether the balance card exists.
 - [ ] The plan's first item fixes the NaN case and adds a test for a new employee.
 - [ ] The handoff's How to verify includes the failed step.

@@ -86,6 +86,21 @@ describe("skills and agents", () => {
     const literal = /`ai`|"ai"|\[ai\b|\bai[- ]tag/; // lower case: "a project's own AI tag" is fine
     for (const f of files) assert.doesNotMatch(readFileSync(join(root, f), "utf8"), literal, `${f} names the "ai" tag; use hashops.ai_tag`);
   });
+  it("the handoff ends with a commit message whose subject carries the ticket key (sync finds base-branch work by it)", () => {
+    const text = readFileSync(join(root, "reference", "handoff-template.md"), "utf8");
+    const block = text.split(/^Commit message$/m)[1];
+    assert.ok(block, "reference/handoff-template.md needs a \"Commit message\" section");
+    const subject = block.trim().split("\n")[0];
+    assert.match(subject, /^[a-z]+(\([a-z-]+\))?: .+\(ACME-\d+(, ACME-\d+)*\)$/, "its subject must be a conventional commit ending in (ACME-12)");
+    const handoff = readFileSync(join(root, "skills", "work", "SKILL.md"), "utf8").split(/^## 7\./m)[1] ?? "";
+    assert.match(handoff, /commit message in a code block/, "work's hand-off step must show the commit message in chat");
+  });
+  it("the ticket assessment defines every check and level work's brief uses", () => {
+    const text = readFileSync(join(root, "reference", "ticket-assessment.md"), "utf8");
+    for (const word of ["Clear", "Valid", "Feasible", "Allowed", "Legitimate", "OK", "Concern", "Stop"])
+      assert.match(text, new RegExp(`\\*\\*${word}\\b`), `reference/ticket-assessment.md must define ${word}`);
+    assert.match(readFileSync(join(root, "skills", "work", "SKILL.md"), "utf8"), /reference\/ticket-assessment\.md/);
+  });
   it("code-investigator is read-only: no Bash, so text from a source cannot run commands", () => {
     const fm = frontmatter(readFileSync(join(root, "agents", "code-investigator.md"), "utf8"));
     assert.doesNotMatch(fm.tools ?? "", /Bash/);

@@ -52,7 +52,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `hooks/feedback-board.json` | The Hashsmith project's own board, its Backlog list and the feedback tags: the one cross-project target the scope hook allows, and where `feedback` files | `hashops-scope.mjs`, the CLI's `feedback-target` |
 | `hooks/hashops-tools.json` | `hashsmith`: the HashOps tools Hashsmith's connection may call (exactly the ones the skills name). `writes`: every HashOps write tool | `hashops-scope.mjs` |
 | `reference/conduct.md` | The behaviour contract injected into every session (≤ 60 lines) | `session-start.mjs` |
-| `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, handoff, verification report, fallback standards | skills, on demand |
+| `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, ticket assessment, handoff, verification report, feedback, fallback standards | skills, on demand |
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |
 | `agents/*.md` | Helper agents with restricted tools | skills, via the Agent tool |
 | `scripts/hashsmith.mjs` | The Hashsmith CLI | skills, through Bash |

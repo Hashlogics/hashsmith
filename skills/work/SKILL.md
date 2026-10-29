@@ -47,10 +47,17 @@ For each ticket or group:
    Plain words, no file paths or line numbers:
    - **Ticket:** code, title, priority.
    - **Area:** the module, page, route or feature it touches (its tags help), in product terms.
-   - **Problem:** what is wrong or wanted, in one or two sentences.
-   - **Approach:** the solution in two or three lines; for a resume, **Done / left**.
+   - **Problem:** what is wrong or wanted, in one line.
+   - **Approach:** the solution in one line, or a few bullets when it needs them; for a resume,
+     **Done / left**.
+   - **Assessment** (`reference/ticket-assessment.md`; not on a resume, again on a QA bounce):
+     `Assessment: OK`, or one line per concern. A **Stop** is the brief's first line instead.
 
-   Ask whether to go on. A no or a correction changes the brief, then show it again.
+   One line per field, bullets beyond that, never a paragraph over three lines. Ask whether to go
+   on, except after a Stop for a broken project rule (Allowed): the ticket is skipped, as the
+   assessment file says. After any Stop, no step 4 questions and no plan come before an explicit
+   go-ahead. A no or a correction changes the brief (and re-runs the assessment), then show it
+   again. On a Concern or Stop, also offer to post the assessment on the ticket (after a yes).
 4. Ask what is still unclear, in one batch with options and a recommendation.
 5. Write the plan: the acceptance criteria restated, the files to change with one line each, the
    tests to add, the checks that will prove it, and for UI tickets that `/hashsmith:design` runs.
@@ -124,19 +131,22 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
    `git diff --no-index /dev/null <file> >> "$P"` (exit code 1 is normal there).
 2. Write the handoff, following `reference/handoff-template.md`: what changed, how to verify (one
    step per criterion; `qa` runs these), screenshots for UI, the verification report, what is left
-   for the developer, a draft PR description, and the git line (its base-branch form when the
-   developer asked for the work on the base branch: commit with the key in the message).
+   for the developer, a draft PR description, the commit message (every ticket key in its
+   subject), and the git line (its base-branch form when the developer asked for the work on the
+   base branch).
 3. Show it with the proposed move to Review and ask for one yes. Then `comment_on_task` with it
    and `move_task` to `lists.review`.
-4. Tell the developer: the changed files (`git status --short`), the verification result, and
-   what to do next: review, commit, push and open a PR into the base branch; then
-   `/hashsmith:next` moves the ticket to QA.
+4. Tell the developer: the changed files (`git status --short`), the verification result, the
+   handoff's commit message in a code block (ready to paste), and what to do next: review, commit
+   with that message, push and open a PR into the base branch (on the base branch: commit with it
+   and push, no PR); then `/hashsmith:next` moves the ticket to QA.
 
 ## 8. Changes after handoff
 
 If the developer asks for changes in the same session, make them, run step 6 again, then update
-the saved patch, and offer a short "Handoff updated" comment with what changed and the new
-verification lines (posted after a yes). The ticket stays in Review.
+the saved patch, and offer a short "Handoff updated" comment with what changed, the new
+verification lines and the commit message, rewritten to cover the whole change (posted after a
+yes). The ticket stays in Review.
 
 ## 9. Lessons and config
 

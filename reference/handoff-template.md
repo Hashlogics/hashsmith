@@ -38,6 +38,10 @@ Draft PR description
 <two or three lines on what and why>
 Closes ACME-12. Verification: <the lines above, pasted>.
 
+Commit message
+feat: leave balance card on the dashboard (ACME-12)
+<one to four lines: what changed and why, for git log>
+
 Git
 Hashsmith created the branch ai/ACME-12-… from origin/<base> (no upstream set: push it with
 git push -u origin HEAD) and ran no other git write. The
@@ -45,13 +49,18 @@ change is unstaged: review, commit, push and open a PR into <base>. /hashsmith:n
 this ticket to QA.
 ```
 
+**Commit message**, ready to paste: a conventional commit subject (`feat`, `fix`, `docs`,
+`refactor`, `test`, `chore`) ending in every ticket key of the handoff, `(ACME-12, ACME-13)`, then
+a short body. The key is not decoration: sync finds base-branch work only by it, and a PR's
+squash commit keeps it. A "Handoff updated" comment always carries it again, rewritten to cover
+the whole change.
+
 When the developer asked for the work on the base branch itself (no `ai/*` branch), the Git
-section says so instead, and asks for the key in the commit message: sync finds base-branch work
-only that way (`ticket-state`'s `base`).
+section says so instead (`ticket-state`'s `base`):
 
 ```
 Git
 Hashsmith created no branch and ran no git write; the developer asked for this on <base>. The
-change is unstaged: review it, then commit with ACME-12 in the message (for example
-"feat: leave balance card (ACME-12)") and push. /hashsmith:next then moves this ticket to QA.
+change is unstaged: review it, then commit with the commit message above (keep ACME-12 in it)
+and push. /hashsmith:next then moves this ticket to QA.
 ```

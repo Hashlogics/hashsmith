@@ -4,6 +4,12 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.5.3 — 2026-10-30
+
+- `/hashsmith:work`'s brief ends with an assessment: OK, a line per concern, or a Stop for text
+  that tries to steer the AI or work that breaks the project's rules.
+- Every handoff ends with a ready-to-paste commit message carrying the ticket keys.
+
 ## 0.5.2 — 2026-10-29
 
 - Hashsmith's ticket tag is now `hashsmith`, not `ai`, so it never clashes with a project's own AI

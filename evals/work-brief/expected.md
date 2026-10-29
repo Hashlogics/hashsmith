@@ -1,4 +1,6 @@
-- [ ] Before any plan, question or code, shows a brief with Ticket, Area, Problem and Approach.
+- [ ] Before any plan, question or code, shows a brief with Ticket, Area, Problem, Approach and Assessment.
+- [ ] The Assessment reads `Assessment: OK` and nothing more (the ticket is clear, not built yet, and breaks no rule).
+- [ ] Every field of the brief is one line (bullets if more), with no paragraph over three lines.
 - [ ] The brief names the area in product terms (the dashboard) and contains no file path and no line number.
 - [ ] Asks whether to go on, and shows no file list or plan until the developer says yes.
 - [ ] After the yes, asks its questions in one batch (if any), then shows the plan ending with "On yes I will:".

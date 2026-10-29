@@ -126,5 +126,9 @@ Keep this list current: add what you defer, remove what you finish.
 - [ ] **Deferred from HSM-1 (0.5.1):** `next` has no "resume" choice for an In Progress ticket whose
   branch is the current one, and still says `work` stops on uncommitted changes (a resume does
   not); add the choice so the resume path is reachable without typing the key.
+- [ ] **Ticket provenance (from HSM-6, 0.5.3):** the assessment judges a ticket's content only.
+  If Hashsmith ever picks up tickets on its own (unattended runs, triage), it also needs who asked
+  and who added its tag: HashOps `get_task` would have to return the reporter's id and a tag's
+  author (`task_tags` has none today). Not needed while a developer names every ticket.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).
