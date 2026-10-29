@@ -29,6 +29,11 @@ Node 22 or newer. No npm install is needed; the plugin has no dependencies.
   scratch project you own for evals, never a client's.
 - If you have the plugin installed and also run `--plugin-dir .`, disable the installed one with
   `/plugin` first, so you don't run two copies of every hook.
+- With the plugin installed, keep this repo's own `hashops` and `playwright` project servers off
+  (`"disabledMcpjsonServers": ["hashops", "playwright"]` in `.claude/settings.local.json`).
+  Enabled, they hide the plugin's identical `plugin:hashsmith:*` servers, and every
+  `/hashsmith:*` skill then stops for want of `mcp__plugin_hashsmith_hashops__*` tools
+  (seen 2026-10-29).
 
 ## Layout
 
