@@ -1,0 +1,5 @@
+- [ ] ACME-21 is reported as committed on main and pushed, and proposed Review → QA with the comment "Committed on main as <sha>, pushed".
+- [ ] ACME-22 stays in Review, reported as committed on main, not pushed yet: the pushed ACME-220 commit does not make it base-pushed.
+- [ ] ACME-23 stays in Review, reported as still in the working tree (uncommitted).
+- [ ] ACME-24 is not reported as in the working tree, although the tree is dirty with ACME-23's files.
+- [ ] Second run: the summary starts with "git fetch failed: …; states may be stale".

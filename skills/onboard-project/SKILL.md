@@ -62,8 +62,12 @@ If `hashsmith.json` exists, this run is a **refresh**:
    any key with no clear match, offering the board's actual list names.
 3. No QA list: offer `create_board_list` with `{board_id, name: "QA", type: "active",
    color: "cyan", before_list_id: <the Done list's id>}`.
-4. `list_project_tags`. No `ai` tag: offer `create_project_tag` with `{project_id, name: "ai"}`.
-   Every Hashsmith ticket carries it, and `create_task` needs at least one tag.
+4. `ai_tag` is `hashsmith` (a fresh onboard always proposes it; a refresh keeps the stored name).
+   A short, generic tag clashes with a project's own AI feature tag, and sync would then
+   manage tickets Hashsmith never touched. `list_project_tags`; when the tag is missing, offer
+   `create_project_tag` with `{project_id, name: <ai_tag>}`. Every Hashsmith ticket carries it,
+   and `create_task` needs at least one tag. A refresh that finds the old default (ai)
+   offers the migration in `reference/config.md`, never runs it unasked; a custom name stays.
 
 The writes in this section need a project lead (or the right HashOps permission). A refusal is not
 an error to retry: note it, carry on, and list it under "ask a project lead" in Finish.

@@ -168,8 +168,10 @@ list ids are stored in `hashsmith.json`.
 | QA | The developer accepted it: a PR exists | `sync` |
 | Done | QA passed | `qa` |
 
-Every ticket Hashsmith creates or touches gets the `ai` tag. A human-created ticket that
-Hashsmith picks up gets the tag when work starts.
+Every ticket Hashsmith creates or touches gets the `hashsmith` tag (`hashops.ai_tag`). A
+human-created ticket that Hashsmith picks up gets the tag when work starts. The default was `ai`
+until 0.5.2 (HSM-2): a short name clashes with a project's own AI feature tag, and sync would then
+manage tickets Hashsmith never touched. `reference/config.md` has the migration.
 
 ### Lifecycle
 
@@ -193,6 +195,21 @@ state from git and GitHub:
 | PR open (`gh pr list --head <branch> --state all`) | QA |
 | PR merged, but QA has not passed | stays in QA; `sync` warns |
 | QA passed | Done (moved by `qa`) |
+| No branch; a commit on `origin/<base>` carries the key (`base-pushed`) | QA |
+| No branch; the key only in a local, unpushed commit on `<base>` (`base-local`) | stays; `sync` reports it |
+| No branch, no such commit, tree on `<base>` touching the ticket's handoff files | stays; reported as still in the working tree |
+
+**Work on the base branch (decided 2026-10-29, HSM-4).** A developer may ask for a ticket to be
+done on the base branch itself, with no `ai/*` branch. Its handoff then asks for the ticket key in
+the commit message, and `ticket-state` searches the last 200 commits of `<base>` and
+`origin/<base>` for it (an exact key match: KEY-1 never matches KEY-12). The key, not the handoff
+patch, is the link: matching changed files would also catch unrelated commits. A failed
+`git fetch` is reported at the top of the sync summary: `origin` can only lag, so a pushed commit
+may show as `base-local` or `no-branch` until the next fetch. "Still in the working tree" is said
+only when the tree is on the base branch and shares a path with that ticket's saved
+`<base>-<KEY>.patch`; a dirty tree is never pinned on every ticket. A `base-pushed` commit older
+than the ticket's last QA failure is not proposed again. `qa` runs base-branch work on the base
+branch itself, after checking the commit is in `HEAD` and `HEAD` matches `origin/<base>`.
 
 `/hashsmith:sync KEY-12 reviewed` is the manual fallback when git cannot tell. `work`, `qa` and
 `intake` run `sync` first, so the board is current whenever Hashsmith starts something.
@@ -220,7 +237,7 @@ secret.
     "project_key": "HOPS",               // task-code prefix; used by the scope hook
     "board_id": "…",
     "lists": { "todo": "…", "in_progress": "…", "review": "…", "qa": "…", "done": "…" },
-    "ai_tag": "ai"
+    "ai_tag": "hashsmith"
   },
   "repo": { "base_branch": "dev" },      // what ai/* branches are cut from and PRs target
   "qa": { "base_url": "http://localhost:8080" },
@@ -310,7 +327,7 @@ Hashsmith up for a project.
 4. Map To Do, In Progress, Review, QA and Done from `get_board` lists by name. If a name differs,
    ask which list it is. Boards created before QA joined the defaults have no QA list: propose
    adding it with `create_board_list` (`before_list_id` = Done).
-5. Check that the `ai` tag exists via `list_project_tags`. If it does not, propose creating it with
+5. Check that the `hashsmith` tag (`ai_tag`) exists via `list_project_tags`. If it does not, propose creating it with
    `create_project_tag`. Tags are per project, and `create_task` requires at least one.
 6. Work out the Sonar key (`hashlogics_` + repo name, or `sonar-project.properties`) and the
    Sentry project. Ask when unsure.
@@ -348,7 +365,7 @@ message), with or without their own instructions, and wants tickets.
    "Open questions".
 7. **Show the draft tickets**: title, priority, acceptance criteria, size note. The developer can
    accept all of them, edit some, or drop some.
-8. Create the tasks in To Do with tags `[ai, …]`, record the meeting in `processed_meetings`, and
+8. Create the tasks in To Do with tags `[ai_tag, …]`, record the meeting in `processed_meetings`, and
    print the ticket codes.
 
 ### `work`
@@ -374,7 +391,7 @@ message), with or without their own instructions, and wants tickets.
 3. **Branch.** Check the working tree is clean (§4). Run `git fetch origin` and then
    `git switch -c ai/KEY-12-slug origin/<base_branch>`. The developer approves the `switch`
    prompt.
-4. Move the ticket to In Progress. Add the `ai` tag: `update_task` **replaces** all tags, so read
+4. Move the ticket to In Progress. Add the `ai_tag` tag: `update_task` **replaces** all tags, so read
    the current tags first and add to them. Comment the plan.
 5. Implement it, following the project's `CLAUDE.md`, skills and patterns. Use Appendix A only
    where the project has no pattern of its own.
@@ -398,9 +415,10 @@ message), with or without their own instructions, and wants tickets.
 **Use when:** run first by `work`, `qa` and `intake`, or when the developer says they have
 reviewed something.
 
-For every `ai`-tagged ticket in In Progress, Review or QA:
+For every ticket tagged `ai_tag` in In Progress, Review or QA:
 - find its branch (`git branch --list 'ai/*KEY-12*'`) and its PR
-  (`gh pr list --head <branch> --state all --json number,state,url,mergedAt`);
+  (`gh pr list --head <branch> --state all --json number,state,url,mergedAt`), or, with no
+  branch, a commit on the base branch carrying its key (§4, "Work on the base branch");
 - apply the state table in §4;
 - show the moves and make them after a yes.
 
@@ -768,7 +786,7 @@ evals never touch real HashOps. A release that turns a scenario red is not done.
 | H4 | `npm run dev:local-users` **replaces** `dev:local-admin`, and every reference is updated (CLAUDE.md commands table, docs, skills) | QA needs one user per role (below) |
 | H5 | `.claude/settings.json`: `Bash(git switch *)` moves from `deny` to `ask`. The Team Workflow line in `CLAUDE.md` changes to match | Hashsmith creates `ai/*` branches (§9) |
 | H6 | Migration `20261028150000_project_documents_bucket.sql`: creates the public `project-documents` bucket where it is missing, plus storage policies for `task-attachments/` (members of the task's project upload, read, delete) | The bucket only existed in the first tenant's dashboard, so attachments failed on local stacks and new tenants, and H2 could not be tested locally |
-| H7 | Three `work_admin` tools, added 2026-10-28: `create_project_tag`, `create_board_list` (`before_list_id` puts QA before Done), `add_project_link`; plus `update_project`/`create_project` take `project_management` (in-app PM on/off) | Onboarding needs the `ai` tag, QA on older boards, PM on and the repo link on every project; doing them by hand in the UI each time was the slowest onboarding step |
+| H7 | Three `work_admin` tools, added 2026-10-28: `create_project_tag`, `create_board_list` (`before_list_id` puts QA before Done), `add_project_link`; plus `update_project`/`create_project` take `project_management` (in-app PM on/off) | Onboarding needs the Hashsmith tag, QA on older boards, PM on and the repo link on every project; doing them by hand in the UI each time was the slowest onboarding step |
 
 **`dev:local-users`** grows out of `scripts/dev/local-admin.sh` and keeps its local-only guard.
 - **Admin:** it creates `admin@example.com` exactly as today.
@@ -780,7 +798,7 @@ evals never touch real HashOps. A release that turns a scenario red is not done.
   `hashsmith.json`.
 
 **Tags, lists and links are tools (H7).** This reverses the first decision (no tools): every
-onboarded project needs the `ai` tag, older boards need QA, and `list_project_links` is how
+onboarded project needs the Hashsmith tag, older boards need QA, and `list_project_links` is how
 onboarding finds the project, so each would otherwise be a manual UI step per project. Each tool
 mirrors the app's form and RLS; edits and deletes stay in the app.
 

@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.5.2 — 2026-10-29
+
+- Hashsmith's ticket tag is now `hashsmith`, not `ai`, so it never clashes with a project's own AI
+  tag. Already onboarded? See "Migrating `ai_tag`" in `reference/config.md`.
+- `/hashsmith:sync` follows work done straight on the base branch (commit it with the ticket key
+  in the message) and says when `git fetch` failed.
+
 ## 0.5.1 — 2026-10-29
 
 - `/hashsmith:work` starts every ticket, new or resumed, with a plain-words brief (the area, the

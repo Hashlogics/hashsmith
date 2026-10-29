@@ -21,7 +21,7 @@ context. Read `hashops.*` and `qa.base_url` from `hashsmith.json` (`check-config
 - Playwright tools present; if not, stop: add the Playwright MCP (`/mcp`) and run
   `npx playwright install chromium` once.
 - Run `/hashsmith:sync` so the QA list is current. Pick the tickets: the ones the developer named,
-  else every `ai`-tagged ticket in QA (ask which, one batch, when there are several).
+  else every ticket in QA tagged `hashops.ai_tag` (ask which, one batch, when there are several).
 
 ## 2. Per ticket: get ready
 
@@ -36,8 +36,11 @@ context. Read `hashops.*` and `qa.base_url` from `hashsmith.json` (`check-config
    `ambiguous` result: ask which branch). Note the branch the developer is on, then
    `git switch <branch>` when it is `local`, else `git switch -c <branch> origin/<branch>` (the
    developer approves the prompt). Hashsmith can switch only to `ai/*` branches: for any other PR
-   branch, ask the developer to switch, then go on.
-4. Compare `git rev-parse HEAD` with `git rev-parse origin/<branch>`. If they differ, the PR has
+   branch, ask the developer to switch, then go on. **Work on the base branch** (`state:
+   "base-pushed"`, no `ai/*` branch): no switch; QA runs on `<base_branch>`, which the developer
+   must be on (`tree.branch`), and `git merge-base --is-ancestor <base.pushed> HEAD` must succeed.
+4. Compare `git rev-parse HEAD` with `git rev-parse origin/<branch>` (for base-branch work,
+   `origin/<base_branch>`). If they differ, the PR has
    commits you don't have (or the reverse): report QA as blocked and ask the developer to bring
    the branch up to date (Hashsmith cannot pull). Never QA stale code.
 5. Bring the local app up the way the project says (its `CLAUDE.md` commands): the local database

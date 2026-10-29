@@ -8,7 +8,8 @@
 //   git-switch           how .claude/settings(.local).json treat `git switch`
 //   check-config         validate hashsmith.json (exit 1 when invalid)
 //   tree                 working-tree state and current branch
-//   ticket-state KEY...  each ticket's ai/* branch (local or on origin) and PR, mapped to the design §4 states
+//   ticket-state KEY...  each ticket's ai/* branch (local or on origin) and PR, mapped to the design §4 states;
+//                        with no branch, commits carrying the key on repo.base_branch (base-pushed / base-local)
 //   feedback-target      the Hashsmith feedback board, list and tags, and the plugin version (exit 1 when invalid)
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -181,6 +182,34 @@ export function ticketStateFor(entries) {
   return entries.length > 1 ? { ...best, ambiguous: true, branches: ranked } : { ...best, ambiguous: false };
 }
 
+/** {sha, at} of the commits whose subject or body carries the key, newest first, from
+ *  `git log --format=%h%x1f%cI%x1f%s%x1f%b%x1e`. HSM-1 never matches HSM-12 or XHSM-1; case is
+ *  ignored. Commit text is untrusted: a record whose sha is not hex is dropped, so a message
+ *  carrying the separators can never put its own text where a sha goes. */
+export function commitsForKey(log, key) {
+  if (!/^[A-Za-z0-9]+-\d+$/.test(String(key ?? ""))) return [];
+  const re = new RegExp(`(?<![A-Za-z0-9])${key}(?!\\d)`, "i");
+  return String(log ?? "")
+    .split("\x1e")
+    .map(r => r.replace(/^\s+/, "").split("\x1f"))
+    .filter(([sha, , subject = "", body = ""]) => /^[0-9a-f]{4,40}$/.test(sha ?? "") && re.test(`${subject}\n${body}`))
+    .map(([sha, at]) => ({ sha, at: at ?? null }));
+}
+
+/** A key with no ai/* branch, from commits carrying it on origin/<base> and on the local <base>
+ *  (newest first): base-pushed beats base-local; neither stays no-branch (design §4). No base
+ *  branch in the config: `base: null`, so nobody reads "not found" into "not searched". */
+export function baseStateFor(base, pushed, local) {
+  const none = { branch: null, pr: null, state: "no-branch", ambiguous: false };
+  if (!base) return { ...none, base: null };
+  const state = pushed.length ? "base-pushed" : local.length ? "base-local" : "no-branch";
+  return {
+    ...none,
+    state,
+    base: { branch: base, pushed: pushed[0]?.sha ?? null, pushed_at: pushed[0]?.at ?? null, local: local[0]?.sha ?? null, local_at: local[0]?.at ?? null },
+  };
+}
+
 /** `git status --porcelain -z` → clean flag and the changed paths, exactly as on disk. */
 export function treeState(porcelainZ) {
   const entries = String(porcelainZ ?? "").split("\0");
@@ -250,6 +279,17 @@ const COMMANDS = {
     const refs = prefix => sh("git", ["for-each-ref", "--format=%(refname:short)", prefix]).split("\n").filter(Boolean);
     const local = refs("refs/heads/ai");
     const branches = aiBranches(local, refs("refs/remotes/origin/ai"));
+    // Work done straight on the base branch has no ai/* branch: look for the key in its commits.
+    const config = tryJson("hashsmith.json");
+    const base = isStr(config?.repo?.base_branch) && config.repo.base_branch.trim() ? config.repo.base_branch.trim() : null;
+    const baseLog = ref => {
+      try {
+        return raw("git", ["log", ref, "-n", "200", "--format=%h%x1f%cI%x1f%s%x1f%b%x1e", "--"]);
+      } catch {
+        return ""; // no such ref yet (no commits, or never fetched)
+      }
+    };
+    const logs = base ? { pushed: baseLog(`refs/remotes/origin/${base}`), local: baseLog(`refs/heads/${base}`) } : { pushed: "", local: "" };
     const out = {};
     for (const key of keys) {
       const entries = [];
@@ -263,7 +303,8 @@ const COMMANDS = {
           return { error: "gh unavailable", hint: "Install gh and run `gh auth login`, or use /hashsmith:sync KEY-12 reviewed." };
         }
       }
-      out[key] = ticketStateFor(entries);
+      out[key] =
+        entries.length === 0 ? baseStateFor(base, commitsForKey(logs.pushed, key), commitsForKey(logs.local, key)) : ticketStateFor(entries);
     }
     return out;
   },

@@ -41,7 +41,8 @@ tree is not clean, choice 3 comes first**, and choices 1, 2 and 4 are shown as "
 tree": `work` and `qa` both stop on uncommitted changes.
 
 1. **Fix a QA bounce:** `/hashsmith:work <KEY>`. A failed QA blocks the release of that work.
-2. **QA what's waiting:** `/hashsmith:qa` for tickets in QA (their PRs are open). It needs the
+2. **QA what's waiting:** `/hashsmith:qa` for tickets in QA (an open PR, or a pushed commit on
+   the base branch). It needs the
    local stack; say so when it is not running.
 3. **Finish a handoff:** tickets in Review whose branch has no PR yet. Remind the developer to
    review, commit, push and open a PR; nothing for Hashsmith to do until then.

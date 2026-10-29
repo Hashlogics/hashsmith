@@ -21,9 +21,15 @@ manage tickets it never touched.
 
 ## 2. Read git and GitHub
 
-Run `git fetch origin`, then the CLI once with every key: `ticket-state ACME-12 ACME-15 …`. It
-prints, per key, the `ai/*` branch (local or only on origin, `local: false`), its PR (`number`,
-`state`, `url`, `mergedAt`) and a state. When several branches carry the key it sets
+Run `git fetch origin`. If it fails (no network, no SSH key), carry on but put "git fetch failed:
+<first line of its error>; states may be stale" at the top of the sync summary: a pushed commit
+may then show as `base-local` or `no-branch`, and a new PR may be missing. Then run CLI `tree`,
+and the CLI once with every key: `ticket-state ACME-12 ACME-15 …`. It prints, per key, the `ai/*`
+branch (local or only on origin, `local: false`), its PR (`number`, `state`, `url`, `mergedAt`)
+and a state. A key with no `ai/*` branch also gets `base`, for work done straight on the base
+branch: the newest commit whose message carries the key on `origin/<base_branch>` (`pushed`,
+`pushed_at`) and on the local base branch (`local`, `local_at`). `base: null` means
+`repo.base_branch` is not set: say "base-branch work not checked (no repo.base_branch)". When several branches carry the key it sets
 `ambiguous: true` and lists them all under `branches`: **propose no move for that ticket**; report
 the branches and their PRs and let the developer say which one is current.
 
@@ -41,9 +47,20 @@ moves those from Review to QA after a yes. Do nothing else.
 | `qa-merged` (PR merged) | Review or In Progress | **QA** | merged before QA; warn that QA should still run |
 | `qa-merged` | QA | stays | warn: merged, QA not passed yet; propose `/hashsmith:qa` |
 | `pr-closed` | any | ask | closed without merging: back to To Do, or leave it? |
-| `no-branch` | In Progress or Review | stays | report it: no `ai/*` branch carries this key (renamed branch?) |
+| `base-pushed` | In Progress or Review | **QA** | delivered on the base branch: comment "Committed on <base> as <sha>, pushed". When the ticket's last QA failure comment ("QA failed (Hashsmith)") is newer than `pushed_at`, it stays: that commit already failed QA |
+| `base-local` | In Progress or Review | stays | report it: "committed on <base> as <sha>, not pushed yet" |
+| `no-branch` | In Progress or Review | stays | see "Whose uncommitted change" below |
 | `qa` | QA | stays | waiting for `/hashsmith:qa` |
 | `review` or `no-branch` | QA | stays | report it: in QA without an open PR (closed, or a renamed branch?) |
+| `base-pushed` | QA | stays | waiting for `/hashsmith:qa` |
+| `base-local` | QA | stays | warn: in QA but its commit on <base> is not pushed |
+
+**Whose uncommitted change.** A `no-branch` ticket is reported "still in the working tree
+(uncommitted)" only when `tree.branch` is the base branch and `tree.files` share a path with its
+saved base-branch patch (`~/.hashsmith/projects/<project_key>/handoffs/<base>-<KEY>.patch`). With
+a clean tree, report that no `ai/*` branch or base-branch commit carries the key (renamed branch,
+or a commit without the key?). Otherwise: "tree not clean on <branch>; cannot tell whether it is
+this ticket's work".
 
 Hashsmith never moves a ticket to Done here; only `qa` does, after QA passes.
 

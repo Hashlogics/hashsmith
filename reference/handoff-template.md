@@ -44,3 +44,14 @@ git push -u origin HEAD) and ran no other git write. The
 change is unstaged: review, commit, push and open a PR into <base>. /hashsmith:next then moves
 this ticket to QA.
 ```
+
+When the developer asked for the work on the base branch itself (no `ai/*` branch), the Git
+section says so instead, and asks for the key in the commit message: sync finds base-branch work
+only that way (`ticket-state`'s `base`).
+
+```
+Git
+Hashsmith created no branch and ran no git write; the developer asked for this on <base>. The
+change is unstaged: review it, then commit with ACME-12 in the message (for example
+"feat: leave balance card (ACME-12)") and push. /hashsmith:next then moves this ticket to QA.
+```

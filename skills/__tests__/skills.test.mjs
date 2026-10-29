@@ -76,6 +76,16 @@ describe("skills and agents", () => {
     for (const tool of named) assert.ok(hashsmith.includes(tool), `a skill uses ${tool}, which hooks/hashops-tools.json does not allow`);
     for (const tool of hashsmith) assert.ok(named.has(tool), `hooks/hashops-tools.json allows ${tool}, which no skill uses`);
   });
+  it("no skill or reference names Hashsmith's tag literally: they read hashops.ai_tag", () => {
+    const files = [
+      ...skillDirs.map(d => join("skills", d, "SKILL.md")),
+      ...readdirSync(join(root, "reference")).map(f => join("reference", f)),
+      ...agentFiles.map(f => join("agents", f)),
+    ];
+    // Quoted, listed or "ai tag" / "ai-tagged" forms; `ai/*` branch names are fine.
+    const literal = /`ai`|"ai"|\[ai\b|\bai[- ]tag/; // lower case: "a project's own AI tag" is fine
+    for (const f of files) assert.doesNotMatch(readFileSync(join(root, f), "utf8"), literal, `${f} names the "ai" tag; use hashops.ai_tag`);
+  });
   it("code-investigator is read-only: no Bash, so text from a source cannot run commands", () => {
     const fm = frontmatter(readFileSync(join(root, "agents", "code-investigator.md"), "utf8"));
     assert.doesNotMatch(fm.tools ?? "", /Bash/);

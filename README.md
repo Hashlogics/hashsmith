@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.5.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.5.2** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -67,7 +67,7 @@ review every change and do the commit, the push and the PR yourself.
    access. You need this even if you already connected HashOps another way (for example
    `peoplemuster` from the in-app Connect dialog): Hashsmith has its own connection, so that its
    project guard applies. Keep the other one for your own use.
-4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.5.1`.
+4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.5.2`.
 
 Optional tools you install yourself (Hashsmith does not declare them, so you never run two
 copies): a SonarQube MCP server (issues on changed files during self-review) and the official
@@ -84,7 +84,7 @@ says so.
    ```
 2. Run `/hashsmith:onboard-project`. It:
    - finds the project's HashOps project from its repository link, and its active board;
-   - maps the board's lists, offering to add a **QA** list and an **`ai`** tag if they are missing;
+   - maps the board's lists, offering to add a **QA** list and a **`hashsmith`** tag if they are missing;
    - fills in the base branch, the local URL and the tool keys;
    - checks your machine and prints a readiness report: pass, fail or blocked for each item, with
      the fix;

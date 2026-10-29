@@ -186,6 +186,59 @@ describe("branches and ticket state", () => {
   });
 });
 
+describe("work on the base branch", () => {
+  // `git log --format=%h%x1f%s%x1f%b%x1e`: sha, subject, body; records end in \x1e.
+  // `git log --format=%h%x1f%cI%x1f%s%x1f%b%x1e`: sha, date, subject, body; records end in \x1e.
+  const log = [
+    ["a1b2c3d", "2026-10-29T12:00:00+05:00", "feat: brief before planning (HSM-1)", ""],
+    ["b2c3d4e", "2026-10-29T11:00:00+05:00", "fix: something else", "Refs HSM-12"],
+    ["c3d4e5f", "2026-10-29T10:00:00+05:00", "docs: tidy", "Closes hsm-1."],
+    ["d4e5f6a", "2026-10-29T09:00:00+05:00", "chore: XHSM-1 lookalike", ""],
+  ]
+    .map(r => r.join("\x1f"))
+    .join("\x1e\n");
+  it("finds the key in subject or body, never as a prefix of a longer number or inside a word", () => {
+    assert.deepEqual(cli.commitsForKey(log, "HSM-1"), [
+      { sha: "a1b2c3d", at: "2026-10-29T12:00:00+05:00" },
+      { sha: "c3d4e5f", at: "2026-10-29T10:00:00+05:00" },
+    ]);
+    assert.deepEqual(cli.commitsForKey(log, "HSM-12"), [{ sha: "b2c3d4e", at: "2026-10-29T11:00:00+05:00" }]);
+    assert.deepEqual(cli.commitsForKey(log, "HSM-2"), []);
+    assert.deepEqual(cli.commitsForKey("", "HSM-1"), []);
+  });
+  it("keeps the key's edges exact: prefixes like ai/ or X- are fine, a longer number never", () => {
+    const l = [["1111111", "d", "merge ai/HSM-1-brief", ""], ["2222222", "d", "X-HSM-1 note", ""], ["3333333", "d", "HSM-1a draft", ""], ["4444444", "d", "HSM-10", ""]]
+      .map(r => r.join("\x1f"))
+      .join("\x1e\n");
+    assert.deepEqual(cli.commitsForKey(l, "HSM-1").map(c => c.sha), ["1111111", "2222222", "3333333"]);
+  });
+  it("never returns message text as a sha, even when a message carries the separators", () => {
+    const evil = `aaaaaaa\x1fd\x1ffeat (HSM-1)\x1fbody\x1e\nnot-a-sha; rm -rf /\x1fd\x1fHSM-1\x1f\x1e\n`;
+    assert.deepEqual(cli.commitsForKey(evil, "HSM-1").map(c => c.sha), ["aaaaaaa"]);
+  });
+  it("refuses a key that is not KEY-n, so an empty key cannot match every commit", () => {
+    assert.deepEqual(cli.commitsForKey(log, ""), []);
+    assert.deepEqual(cli.commitsForKey(log, "HSM"), []);
+    assert.deepEqual(cli.commitsForKey(log, ".*"), []);
+  });
+  it("maps commits to a state: pushed beats local, nothing stays no-branch", () => {
+    const c = (sha, at) => ({ sha, at });
+    assert.deepEqual(cli.baseStateFor("main", [c("a1b2c3d", "2026-10-29T10:00:00+05:00")], [c("a1b2c3d", "2026-10-29T10:00:00+05:00")]), {
+      branch: null,
+      pr: null,
+      state: "base-pushed",
+      ambiguous: false,
+      base: { branch: "main", pushed: "a1b2c3d", pushed_at: "2026-10-29T10:00:00+05:00", local: "a1b2c3d", local_at: "2026-10-29T10:00:00+05:00" },
+    });
+    assert.equal(cli.baseStateFor("main", [], [c("e5f6a7b", "x")]).state, "base-local");
+    assert.deepEqual(cli.baseStateFor("main", [], []).base, { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null });
+    assert.equal(cli.baseStateFor("main", [], []).state, "no-branch");
+  });
+  it("says when no base branch was searched", () => {
+    assert.deepEqual(cli.baseStateFor(null, [], []), { branch: null, pr: null, state: "no-branch", ambiguous: false, base: null });
+  });
+});
+
 describe("feedbackTarget", () => {
   const board = { _comment: "x", project_id: U(1), board_id: U(2), project_key: "hsm", list_id: U(3), tags: ["feedback"], duplicate_tag: "duplicate" };
   it("returns the board, list, tags and plugin version, without the comment", () => {
@@ -247,6 +300,15 @@ describe("CLI", () => {
     const out = JSON.parse(r.stdout);
     assert.equal(out.origin, "github.com/org/app");
     assert.deepEqual(out.matches, ["https://github.com/org/app/tree/dev"]);
+  });
+  it("ticket-state reports a key with no branch and no commits as no-branch, with the base it searched", () => {
+    const dir = fixtureRepo();
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ repo: { base_branch: "main" } }));
+    const r = spawnSync(process.execPath, [CLI, "ticket-state", "ACME-1"], { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout)["ACME-1"], {
+      branch: null, pr: null, state: "no-branch", ambiguous: false, base: { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null },
+    });
   });
   it("an unknown command exits 2 with usage", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });

@@ -16,7 +16,7 @@ a token or an email (`config-guard.mjs` blocks them). Validate after every write
     "project_key": "HOPS",               // task-code prefix; used by the scope hook
     "board_id": "…",
     "lists": { "todo": "…", "in_progress": "…", "review": "…", "qa": "…", "done": "…" },
-    "ai_tag": "ai"
+    "ai_tag": "hashsmith"
   },
   "repo": { "base_branch": "dev" },      // what ai/* branches are cut from and PRs target
   "qa": { "base_url": "http://localhost:8080" },
@@ -93,8 +93,23 @@ JWTs, `sk_`, `ghp_`, `xox[abp]-` and `-----BEGIN` patterns; learned key names co
 | `hashops.project_id`, `project_key` | the project whose `repository` link matches `repo-slug`'s origin (`list_project_links`), else the developer's pick from `list_my_projects` |
 | `hashops.board_id` | the stored id while `get_board` finds it active in the project; else `list_boards {project_id, status: "active"}`: one → use it, several → ask |
 | `hashops.lists.*` | `get_board` list names, case-insensitive: To Do / Todo, In Progress, Review, QA, Done |
-| `hashops.ai_tag` | `ai`, created with `create_project_tag` when `list_project_tags` lacks it |
+| `hashops.ai_tag` | `hashsmith`, created with `create_project_tag` when `list_project_tags` lacks it |
 | `repo.base_branch` | the PR target in the project's CLAUDE.md, else `git rev-parse --abbrev-ref origin/HEAD` |
 | `qa.base_url` | `http://localhost:<port>` from the dev script or dev-server config |
 | `sonar.project_key` | `sonar-project.properties`, else `hashlogics_<repo>` |
 | `sentry.project` | the Sentry tools' project list, only when the session has them |
+
+## Migrating `ai_tag` to `hashsmith`
+
+Projects onboarded before 0.5.2 store the old default, ai, as `ai_tag`; it can clash with a
+project's own AI tag. To move one over, with the developer's yes at each write, in this order
+(retag before switching, so no ticket in flight drops out of `sync` and `qa` halfway):
+1. `create_project_tag` with `{project_id, name: "hashsmith"}` when `list_project_tags` lacks it.
+2. For every ticket in In Progress, Review or QA, and every QA bounce in To Do, that Hashsmith
+   worked (`get_task {task_code, full: true}` shows a "Plan (Hashsmith)" comment): `update_task`
+   with its current tags plus `hashsmith` (`tags` replaces all tags; keep the others). Tickets
+   that carry the old tag only because a person put it there for the feature are left alone;
+   unworked To Do tickets get the new tag when `work` starts them.
+3. Set `hashops.ai_tag` to `hashsmith` in `hashsmith.json`, then run `check-config`.
+4. The old tag stays on the project (there is no delete tool); remove it in HashOps if nothing
+   else uses it.

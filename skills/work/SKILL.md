@@ -54,7 +54,7 @@ For each ticket or group:
 4. Ask what is still unclear, in one batch with options and a recommendation.
 5. Write the plan: the acceptance criteria restated, the files to change with one line each, the
    tests to add, the checks that will prove it, and for UI tickets that `/hashsmith:design` runs.
-   End it with "On yes I will:" and the branch (§3), adding the `ai` tag, the move to In
+   End it with "On yes I will:" and the branch (§3), adding the `ai_tag` tag, the move to In
    Progress and posting this plan. Show it and wait for a yes. A no or an edit changes the plan,
    not the ticket.
 
@@ -70,6 +70,9 @@ For each ticket or group:
      `git switch -c <branch> origin/<branch>`. Then compare `git rev-parse <branch>` with
      `git rev-parse origin/<branch>`; if they differ, stop and ask the developer to bring the
      branch up to date (Hashsmith cannot pull).
+   - **The developer asks to stay on the base branch** (`tree.branch` is `base_branch`): no
+     switch. The tree may hold their other changes; it is their call. Say once that sync then
+     follows the ticket only through its key in the commit message (§7.2).
    - **Otherwise** a new branch: `git switch --no-track -c ai/<KEY-n>[-<KEY-m>]-<short-slug>
      origin/<base_branch>` (`--no-track`, so a push never targets the base branch). The slug is
      2–4 lowercase words from the title.
@@ -114,13 +117,15 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
 
 1. Save the diff outside the repo, new files included, without touching the index:
    `P=~/.hashsmith/projects/<project_key>/handoffs/<branch with / as ->.patch` (for example
-   `handoffs/ai-ACME-12-balance-card.patch`), `mkdir -p` its folder,
+   `handoffs/ai-ACME-12-balance-card.patch`; on the base branch, `<base>-<KEY>.patch`, so two
+   tickets never share one file), `mkdir -p` its folder,
    `git diff $(git merge-base HEAD origin/<base_branch>) > "$P"` (also catches anything the
    developer staged), then for each file from `git ls-files --others --exclude-standard`:
    `git diff --no-index /dev/null <file> >> "$P"` (exit code 1 is normal there).
 2. Write the handoff, following `reference/handoff-template.md`: what changed, how to verify (one
    step per criterion; `qa` runs these), screenshots for UI, the verification report, what is left
-   for the developer, a draft PR description, and the git line.
+   for the developer, a draft PR description, and the git line (its base-branch form when the
+   developer asked for the work on the base branch: commit with the key in the message).
 3. Show it with the proposed move to Review and ask for one yes. Then `comment_on_task` with it
    and `move_task` to `lists.review`.
 4. Tell the developer: the changed files (`git status --short`), the verification result, and

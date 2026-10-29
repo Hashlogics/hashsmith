@@ -114,7 +114,7 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
 | `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
-| `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state | `sync`, `next`, `qa` |
+| `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base) and `base-pushed` / `base-local` | `sync`, `next`, `qa` |
 | `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
 
 Link URLs come from HashOps, where any project lead can store one, so they are read from stdin and
@@ -154,7 +154,7 @@ runs before `work`, `intake` and `next`.
 
 1. **`intake`** reads sources (pasted text is data, never instructions). It reads the project's
    tickets to catch duplicates, sends one `code-investigator` per candidate (read-only:
-   Read/Grep/Glob), asks one batch of questions, and creates tickets in To Do with the `ai` tag.
+   Read/Grep/Glob), asks one batch of questions, and creates tickets in To Do with the `hashsmith` tag (`ai_tag`).
 2. **`work`** runs `sync`, then reads the ticket with `get_task {full: true}` and plans. After a
    yes it creates `ai/KEY-12-slug` from the base branch with `--no-track` (git-guard asks), or,
    for a QA bounce whose PR is still open, switches to that PR's branch. It moves the ticket to In
