@@ -90,6 +90,12 @@ an error to retry: note it, carry on, and list it under "ask a project lead" in 
   `hashlogics_<repo folder name>`.
 - `sentry.project`: only when the session has Sentry MCP tools; find it with them. Otherwise
   leave the key out and say "Sentry: not installed (optional)".
+- `changelog`: the CLI's `changelog` (`reference/changelog.md`). It prints the stored mode, or
+  what the repo shows: a tool that builds it from commits → `commits` ("Changelog: built by
+  <generator>"), a changelog file → `write` ("Changelog: Hashsmith adds lines to <path>"). On `ask: true`, put the question in this step's
+  batch, recommending yes; anything but a clear no records `write` with its `path`, a clear no
+  records `off`. On `changed` (a stored `write` now meeting a generator), record it and say so.
+  Nothing is created now: the first entry creates the file.
 
 ## 5. Readiness report
 

@@ -22,6 +22,7 @@ a token or an email (`config-guard.mjs` blocks them). Validate after every write
   "qa": { "base_url": "http://localhost:8080" },
   "sonar": { "project_key": "hashlogics_hashops" },
   "sentry": { "project": "…" },
+  "changelog": { "mode": "write", "path": "CHANGELOG.md" },  // write | commits | off (reference/changelog.md)
   "intake": {
     "processed_meetings": [
       { "id": "…", "on": "2026-10-27", "tickets": ["HOPS-120", "HOPS-121"] },
@@ -98,6 +99,7 @@ JWTs, `sk_`, `ghp_`, `xox[abp]-` and `-----BEGIN` patterns; learned key names co
 | `qa.base_url` | `http://localhost:<port>` from the dev script or dev-server config |
 | `sonar.project_key` | `sonar-project.properties`, else `hashlogics_<repo>` |
 | `sentry.project` | the Sentry tools' project list, only when the session has them |
+| `changelog.mode`, `path` | the CLI's `changelog`: a tool that builds it from commits → `commits`; else a root `CHANGELOG.md` / `CHANGES.md` / `HISTORY.md` → `write`; else one question, where anything but a clear no is `write` (`reference/changelog.md`). A stored `write` turns stale once a generator appears; `off` always stands |
 
 ## Migrating `ai_tag` to `hashsmith`
 

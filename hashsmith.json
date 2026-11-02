@@ -15,5 +15,9 @@
   },
   "repo": {
     "base_branch": "main"
+  },
+  "changelog": {
+    "mode": "off",
+    "path": "CHANGELOG.md"
   }
 }

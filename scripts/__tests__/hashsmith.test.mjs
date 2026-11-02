@@ -143,6 +143,7 @@ describe("checkConfig", () => {
     repo: { base_branch: "dev" },
     qa: { base_url: "http://localhost:8080" },
     sonar: { project_key: "hashlogics_acme" },
+    changelog: { mode: "write", path: "CHANGELOG.md" },
     intake: { processed_meetings: [{ id: "m1", on: "2026-10-27", tickets: ["ACME-1"], note: "x" }] },
     learned: { qa_login_route: { value: "/login", why: "w", source: "s", added: "2026-10-28" } },
   });
@@ -162,6 +163,11 @@ describe("checkConfig", () => {
       c => (c.intake.processed_meetings[0].tickets = ["acme-1"]),
       c => (c.extra = 1),
       c => (c.learned.QaRoute = c.learned.qa_login_route),
+      c => (c.changelog.mode = "auto"),
+      c => (c.changelog.path = "docs/CHANGELOG.md"),
+      c => (c.changelog.path = ".."),
+      c => delete c.changelog.path,
+      c => (c.changelog.path = "package.json"),
     ])
       assert.equal(broken(mutate).length, 1, String(mutate));
   });
@@ -183,6 +189,160 @@ describe("checkConfig", () => {
     assert.deepEqual(checkConfig(c), []);
   });
   it("rejects a non-object", () => assert.ok(checkConfig(null).length > 0));
+  it("accepts every changelog mode, and no changelog key at all", () => {
+    for (const mode of ["write", "commits", "off"]) {
+      const c = valid();
+      c.changelog.mode = mode;
+      assert.deepEqual(checkConfig(c), [], mode);
+    }
+    const c = valid();
+    delete c.changelog;
+    assert.deepEqual(checkConfig(c), []);
+  });
+});
+
+describe("changelog mode", () => {
+  const detect = (names, packageJson = null, workflows = []) => cli.changelogDetect({ names, packageJson, workflows });
+  it("finds a changelog file at the root in any case, CHANGELOG before CHANGES before HISTORY", () => {
+    assert.deepEqual(detect(["src", "changelog.md"]), { generator: null, file: "changelog.md" });
+    assert.deepEqual(detect(["HISTORY.md", "Changes.md"]), { generator: null, file: "Changes.md" });
+    assert.deepEqual(detect(["src", "README.md", "CHANGELOG.txt"]), { generator: null, file: null });
+  });
+  it("finds a generator from its root files", () => {
+    for (const [name, generator] of [
+      ["release-please-config.json", "release-please"],
+      [".release-please-manifest.json", "release-please"],
+      [".changeset", "changesets"],
+      [".releaserc.yml", "semantic-release"],
+      ["release.config.cjs", "semantic-release"],
+      [".versionrc.json", "standard-version"],
+      ["cliff.toml", "git-cliff"],
+      [".auto-changelog", "auto-changelog"],
+    ])
+      assert.equal(detect(["CHANGELOG.md", name]).generator, generator, name);
+  });
+  it("finds a generator in package.json dependencies, scripts or its release key", () => {
+    assert.equal(detect([], { devDependencies: { "@changesets/cli": "2" } }).generator, "changesets");
+    assert.equal(detect([], { scripts: { release: "commit-and-tag-version" } }).generator, "commit-and-tag-version");
+    assert.equal(detect([], { release: { branches: ["main"] } }).generator, "semantic-release");
+    assert.equal(detect([], { scripts: { build: "vite build" }, dependencies: { react: "18" } }).generator, null);
+    assert.equal(detect([], { __invalid: true }).generator, null);
+    assert.equal(detect([".release-it.json"], { "release-it": { git: {} } }).generator, null, "release-it alone writes no changelog");
+    assert.equal(detect([], { devDependencies: { "@release-it/conventional-changelog": "8" } }).generator, "conventional-changelog");
+    assert.equal(detect([".versionrc"], { devDependencies: { "commit-and-tag-version": "12" } }).generator, "commit-and-tag-version", "package.json names the tool more exactly than .versionrc");
+  });
+  it("finds a generator in a workflow, and not in a workflow that only bumps the version", () => {
+    assert.equal(detect([], null, ["steps:\n  - uses: googleapis/release-please-action@v4\n"]).generator, "release-please");
+    assert.equal(detect([], null, ["run: npm version patch --no-git-tag-version\n# once per release, items\n"]).generator, null);
+  });
+
+  const found = { generator: null, file: "CHANGES.md" };
+  const generated = { generator: "release-please", file: "CHANGELOG.md" };
+  const none = { generator: null, file: null };
+  it("with nothing stored: a generator gives commits, a file gives write, neither asks", () => {
+    assert.deepEqual(cli.changelogDecision(null, generated), { mode: "commits", path: "CHANGELOG.md", generator: "release-please", ask: false, changed: true });
+    assert.deepEqual(cli.changelogDecision(null, found), { mode: "write", path: "CHANGES.md", generator: null, ask: false, changed: true });
+    assert.deepEqual(cli.changelogDecision(null, none), { mode: null, path: "CHANGELOG.md", generator: null, ask: true, changed: false });
+  });
+  it("a stored value stands, except write meeting a generator, which turns stale", () => {
+    const off = { mode: "off", path: "CHANGELOG.md" };
+    assert.deepEqual(cli.changelogDecision(off, generated), { mode: "off", path: "CHANGELOG.md", generator: null, ask: false, changed: false });
+    const write = { mode: "write", path: "CHANGELOG.md" };
+    assert.deepEqual(cli.changelogDecision(write, none), { mode: "write", path: "CHANGELOG.md", generator: null, ask: false, changed: false });
+    assert.deepEqual(cli.changelogDecision(write, generated), { mode: "commits", path: "CHANGELOG.md", generator: "release-please", ask: false, changed: true });
+    const commits = { mode: "commits", path: "CHANGELOG.md" };
+    assert.deepEqual(cli.changelogDecision(commits, none), { mode: "commits", path: "CHANGELOG.md", generator: null, ask: false, changed: false });
+  });
+});
+
+describe("changelog check", () => {
+  const patch = (path, body, header = "") => `diff --git a/${path} b/${path}\n${header}--- a/${path}\n+++ b/${path}\n@@ -1,3 +1,4 @@\n${body}`;
+  const code = patch("src/a.ts", "+export const a = 1;\n-export const a = 0;\n");
+  const check = (type, p) => cli.changelogCheck(type, p, "CHANGELOG.md");
+  it("maps the commit type to a heading; only feat, fix and perf need an entry", () => {
+    assert.deepEqual([check("feat", code).heading, check("fix", code).heading, check("perf", code).heading], ["Added", "Fixed", "Improved"]);
+    for (const type of ["chore", "refactor", "test", "docs", "build", "ci", "style", "revert"]) {
+      const r = check(type, code);
+      assert.equal(r.needs_entry, false, type);
+      assert.equal(r.missing_entry, false, type);
+    }
+  });
+  it("reports a missing entry when a user-visible change leaves the changelog untouched", () => {
+    assert.deepEqual(check("feat", code), { needs_entry: true, heading: "Added", missing_entry: true, problems: [] });
+    const withEntry = code + patch("CHANGELOG.md", " ## Unreleased\n+### Added\n+- You can now see your leave balance on the dashboard.\n");
+    assert.deepEqual(check("feat", withEntry), { needs_entry: true, heading: "Added", missing_entry: false, problems: [] });
+  });
+  it("counts only an added entry line: not a blank, a heading or a link reference", () => {
+    assert.equal(check("feat", code + patch("CHANGELOG.md", "+\n")).missing_entry, true);
+    assert.equal(check("feat", code + patch("CHANGELOG.md", "+## Unreleased\n+### Added\n")).missing_entry, true);
+    assert.equal(check("feat", code + patch("CHANGELOG.md", "+[Unreleased]: https://github.com/acme/app/compare/v1.0.0...HEAD\n")).missing_entry, true);
+    assert.equal(check("feat", code + patch("CHANGELOG.md", "-- An old line.\n")).missing_entry, true);
+  });
+  it("reads a new changelog file from a /dev/null diff", () => {
+    const created = code + patch("CHANGELOG.md", "+# Changelog\n+\n+## Unreleased\n+\n+### Fixed\n+- Saving a form twice no longer creates two records.\n", "new file mode 100644\n").replace("--- a/CHANGELOG.md", "--- /dev/null");
+    assert.deepEqual(check("fix", created).problems, []);
+    assert.equal(check("fix", created).missing_entry, false);
+  });
+  it("flags technical text in added lines: ticket keys, file names, code spans", () => {
+    const p = patch("CHANGELOG.md", [
+      "+- Leave balance card (ACME-12).",
+      "+- Fixed a crash in src/pages/Dashboard.tsx.",
+      "+- The `useLeaveStore` hook caches results.",
+      "+- Read more at https://acme.example.com/help/leave.html.",
+      "+- Works with UTF-8 names.",
+      "",
+    ].join("\n"));
+    const problems = check("feat", p).problems;
+    assert.equal(problems.length, 3, problems.join("\n"));
+    assert.match(problems[0], /ticket key ACME-12/);
+    assert.match(problems[1], /file name/);
+    assert.match(problems[2], /code/);
+  });
+  it("flags a removed heading and an added version heading: releases belong to the project", () => {
+    const p = patch("CHANGELOG.md", "-## Unreleased\n+## 1.4.0 — 2026-11-03\n ### Added\n");
+    const problems = check("feat", p).problems;
+    assert.equal(problems.length, 2, problems.join("\n"));
+    assert.match(problems.join("\n"), /removes a section heading/);
+    assert.match(problems.join("\n"), /release heading/);
+  });
+  it("ignores other files' lines and hunk headers that look like +/- lines", () => {
+    const p = patch("README.md", "+- See ACME-12 in src/a.ts\n") + patch("CHANGELOG.md", " ## Unreleased\n+- Exports now include the team name.\n");
+    assert.deepEqual(check("feat", p).problems, []);
+  });
+  it("refuses an unknown commit type", () => assert.match(check("feature", code).error, /commit type/));
+  it("finds the changelog whatever prefixes the patch uses (diff.noprefix, diff.mnemonicPrefix)", () => {
+    const entry = "@@ -1 +1,2 @@\n ## Unreleased\n+- Exports now include the team name.\n";
+    for (const [from, to] of [["c/", "w/"], ["", ""]]) {
+      const p = `diff --git ${from}CHANGELOG.md ${to}CHANGELOG.md\n--- ${from}CHANGELOG.md\n+++ ${to}CHANGELOG.md\n${entry}`;
+      assert.equal(check("feat", p).missing_entry, false, from || "no prefix");
+    }
+    const elsewhere = "diff --git a/docs/CHANGELOG.md b/docs/CHANGELOG.md\n--- a/docs/CHANGELOG.md\n+++ b/docs/CHANGELOG.md\n" + entry;
+    assert.equal(check("feat", elsewhere).missing_entry, true, "a changelog in a subfolder is not the root one");
+  });
+  it("flags any added release heading and a removed link reference", () => {
+    for (const heading of ["## Version 2.0", "## 2026-11-03", "## [1.2.0] - 2026-11-03", "# 3.0.0"])
+      assert.equal(check("feat", patch("CHANGELOG.md", `+${heading}\n`)).problems.length, 1, heading);
+    for (const ok of ["# Changelog", "## Unreleased", "## [Unreleased]", "### Added", "## Added"])
+      assert.deepEqual(check("feat", patch("CHANGELOG.md", `+${ok}\n`)).problems, [], ok);
+    assert.equal(check("feat", patch("CHANGELOG.md", "-[Unreleased]: https://github.com/acme/app/compare/v1.0.0...HEAD\n")).problems.length, 1);
+  });
+  it("flags any ticket key, not only this project's, but not standards like UTF-8 or ISO-8601", () => {
+    assert.match(check("fix", patch("CHANGELOG.md", "+- Fixed the HOPS-12 crash.\n")).problems.join(), /ticket key HOPS-12/);
+    assert.deepEqual(check("fix", patch("CHANGELOG.md", "+- Names in UTF-8 and ISO-8601 dates now import correctly.\n")).problems, []);
+  });
+  it("flags a changed version field in the root package.json: versions belong to the project", () => {
+    const bump = patch("package.json", '-  "version": "1.4.0",\n+  "version": "1.5.0",\n');
+    assert.match(check("feat", code + bump).problems.join(), /version field in package.json/);
+    assert.deepEqual(check("feat", code + patch("packages/ui/package.json", '+  "version": "2.0.0",\n')).problems, []);
+    assert.deepEqual(check("feat", code + patch("package.json", '+    "react": "18.3.1",\n')).problems, []);
+  });
+  it("does not take product names like GPT-4 for ticket keys", () => {
+    assert.deepEqual(check("feat", patch("CHANGELOG.md", "+- Summaries now use GPT-4.\n")).problems, []);
+  });
+  it("does not take product names like Next.js or Node.js for file names", () => {
+    assert.deepEqual(check("feat", patch("CHANGELOG.md", "+- The app now runs on Node.js 22 and Next.js 15.\n")).problems, []);
+    assert.equal(check("feat", patch("CHANGELOG.md", "+- Updated next.config.js.\n")).problems.length, 1);
+  });
 });
 
 describe("branches and ticket state", () => {
@@ -370,6 +530,39 @@ describe("CLI", () => {
     assert.deepEqual(JSON.parse(r.stdout)["ACME-1"], {
       branch: null, pr: null, state: "no-branch", ambiguous: false, base: { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null },
     });
+  });
+  it("changelog reads the repo's top level and prints names only, never file text", () => {
+    const dir = fixtureRepo();
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    writeFileSync(join(dir, ".github/workflows/release.yml"), "# SECRET-WORKFLOW-TEXT\n- uses: changesets/action@v1\n");
+    writeFileSync(join(dir, "Changelog.md"), "# SECRET-CHANGELOG-TEXT\n");
+    mkdirSync(join(dir, "sub"));
+    const r = spawnSync(process.execPath, [CLI, "changelog"], { cwd: join(dir, "sub"), encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { mode: "commits", path: "Changelog.md", generator: "changesets", ask: false, changed: true });
+    assert.doesNotMatch(r.stdout, /SECRET/);
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ changelog: { mode: "off", path: "CHANGELOG.md" } }));
+    const stored = spawnSync(process.execPath, [CLI, "changelog"], { cwd: dir, encoding: "utf8" });
+    assert.equal(JSON.parse(stored.stdout).mode, "off");
+  });
+  it("changelog-check reads the patch on stdin and the mode, path and key from hashsmith.json", () => {
+    const dir = fixtureRepo();
+    const patch = "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1 @@\n+x\n";
+    const run = (args, config) => {
+      if (config) writeFileSync(join(dir, "hashsmith.json"), JSON.stringify(config));
+      return spawnSync(process.execPath, [CLI, "changelog-check", ...args], { cwd: dir, encoding: "utf8", input: patch });
+    };
+    const hashops = { project_key: "ACME" };
+    const write = run(["feat"], { hashops, changelog: { mode: "write", path: "CHANGELOG.md" } });
+    assert.equal(write.status, 0, write.stderr);
+    assert.deepEqual(JSON.parse(write.stdout), { mode: "write", path: "CHANGELOG.md", needs_entry: true, heading: "Added", missing_entry: true, problems: [] });
+    const commits = run(["feat"], { hashops, changelog: { mode: "commits", path: "CHANGELOG.md" } });
+    assert.deepEqual(JSON.parse(commits.stdout), { mode: "commits", path: "CHANGELOG.md", needs_entry: false });
+    const missing = run(["feat"], { hashops });
+    assert.equal(missing.status, 2);
+    assert.match(JSON.parse(missing.stdout).error, /changelog/);
+    const badType = run(["feature"], { hashops, changelog: { mode: "write", path: "CHANGELOG.md" } });
+    assert.equal(badType.status, 2);
   });
   it("an unknown command exits 2 with usage", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });

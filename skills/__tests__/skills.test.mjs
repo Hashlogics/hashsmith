@@ -95,6 +95,20 @@ describe("skills and agents", () => {
     const handoff = readFileSync(join(root, "skills", "work", "SKILL.md"), "utf8").split(/^## 7\./m)[1] ?? "";
     assert.match(handoff, /commit message in a code block/, "work's hand-off step must show the commit message in chat");
   });
+  it("work writes the changelog entry before self-review, checks it, and reports it at handoff", () => {
+    const work = readFileSync(join(root, "skills", "work", "SKILL.md"), "utf8");
+    const [implement, review, handoff] = [/^## 5\./m, /^## 6\./m, /^## 7\./m].map(re => work.split(re)[1]?.split(/^## \d/m)[0] ?? "");
+    assert.match(implement, /reference\/changelog\.md/, "§5 must write the entry (reference/changelog.md) before self-review");
+    assert.match(review, /changelog-check <type> < "\$P"/, "§6 must run changelog-check on the patch");
+    assert.match(handoff, /`Changelog:` line/, "§7 must carry the Changelog line");
+    const template = readFileSync(join(root, "reference", "handoff-template.md"), "utf8");
+    assert.match(template, /^Changelog: added under Unreleased — "/m, "the handoff template needs the Changelog line");
+    assert.match(readFileSync(join(root, "skills", "onboard-project", "SKILL.md"), "utf8"), /CLI's `changelog`/);
+  });
+  it("Hashsmith never touches a project's versions or releases", () => {
+    const text = readFileSync(join(root, "reference", "changelog.md"), "utf8");
+    assert.match(text, /\*\*Never\*\* edit a version field, add or rename a version heading, rename `Unreleased`/);
+  });
   it("the ticket assessment defines every check and level work's brief uses", () => {
     const text = readFileSync(join(root, "reference", "ticket-assessment.md"), "utf8");
     for (const word of ["Clear", "Valid", "Feasible", "Allowed", "Legitimate", "OK", "Concern", "Stop"])

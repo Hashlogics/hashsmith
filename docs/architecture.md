@@ -52,7 +52,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `hooks/feedback-board.json` | The Hashsmith project's own board, its Backlog list and the feedback tags: the one cross-project target the scope hook allows, and where `feedback` files | `hashops-scope.mjs`, the CLI's `feedback-target` |
 | `hooks/hashops-tools.json` | `hashsmith`: the HashOps tools Hashsmith's connection may call (exactly the ones the skills name). `writes`: every HashOps write tool | `hashops-scope.mjs` |
 | `reference/conduct.md` | The behaviour contract injected into every session (≤ 60 lines) | `session-start.mjs` |
-| `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, ticket assessment, handoff, verification report, feedback, fallback standards | skills, on demand |
+| `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, ticket assessment, handoff, changelog, verification report, feedback, fallback standards | skills, on demand |
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |
 | `agents/*.md` | Helper agents with restricted tools | skills, via the Agent tool |
 | `scripts/hashsmith.mjs` | The Hashsmith CLI | skills, through Bash |
@@ -116,6 +116,8 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
 | `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base) and `base-pushed` / `base-local` | `sync`, `next`, `qa` |
+| `changelog` | the changelog `mode` and `path` to use (stored, else detected from the repo's root files, `package.json` and workflows; tool and file names only), the `generator`, `ask` (nothing stored or found) and `changed` (write it to `hashsmith.json`) | `onboard-project`, `work` |
+| `changelog-check TYPE` (the handoff patch on stdin) | in `write` mode: `needs_entry` and `heading` for the commit type, `missing_entry`, and `problems` (ticket keys, file names or code in an entry, a release heading added or a section heading removed in the changelog, a changed `version` in the root `package.json`) | `work` |
 | `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
 
 Link URLs come from HashOps, where any project lead can store one, so they are read from stdin and

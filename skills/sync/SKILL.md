@@ -57,7 +57,8 @@ moves those from Review to QA after a yes. Do nothing else.
 
 **Whose uncommitted change.** A `no-branch` ticket is reported "still in the working tree
 (uncommitted)" only when `tree.branch` is the base branch and `tree.files` share a path with its
-saved base-branch patch (`~/.hashsmith/projects/<project_key>/handoffs/<base>-<KEY>.patch`). With
+saved base-branch patch (`~/.hashsmith/projects/<project_key>/handoffs/<base>-<KEY>.patch`),
+leaving out `changelog.path` and `hashsmith.json`: any ticket's patch may touch them. With
 a clean tree, report that no `ai/*` branch or base-branch commit carries the key (renamed branch,
 or a commit without the key?). Otherwise: "tree not clean on <branch>; cannot tell whether it is
 this ticket's work".

@@ -107,6 +107,7 @@ hashsmith/
 │   ├── ticket-template.md
 │   ├── handoff-template.md
 │   ├── ticket-assessment.md
+│   ├── changelog.md            changelog modes, where entries go, plain-English wording
 │   ├── verification-report.md
 │   └── feedback-template.md
 ├── .mcp.json                   hashops only (SonarQube, Sentry: the developer's own)
@@ -208,8 +209,9 @@ patch, is the link: matching changed files would also catch unrelated commits. A
 `git fetch` is reported at the top of the sync summary: `origin` can only lag, so a pushed commit
 may show as `base-local` or `no-branch` until the next fetch. "Still in the working tree" is said
 only when the tree is on the base branch and shares a path with that ticket's saved
-`<base>-<KEY>.patch`; a dirty tree is never pinned on every ticket. A `base-pushed` commit older
-than the ticket's last QA failure is not proposed again. `qa` runs base-branch work on the base
+`<base>-<KEY>.patch`, leaving out `changelog.path` and `hashsmith.json` (any patch may touch
+them); a dirty tree is never pinned on every ticket. A `base-pushed` commit older than the
+ticket's last QA failure is not proposed again. `qa` runs base-branch work on the base
 branch itself, after checking the commit is in `HEAD` and `HEAD` matches `origin/<base>`.
 
 `/hashsmith:sync KEY-12 reviewed` is the manual fallback when git cannot tell. `work`, `qa` and
@@ -244,6 +246,7 @@ secret.
   "qa": { "base_url": "http://localhost:8080" },
   "sonar": { "project_key": "hashlogics_hashops" },
   "sentry": { "project": "…" },
+  "changelog": { "mode": "write", "path": "CHANGELOG.md" },  // write | commits | off (reference/changelog.md)
   "intake": {
     "processed_meetings": [
       { "id": "…", "on": "2026-10-27", "tickets": ["HOPS-120", "HOPS-121"] },
@@ -334,7 +337,15 @@ Hashsmith up for a project.
 5. Check that the `hashsmith` tag (`ai_tag`) exists via `list_project_tags`. If it does not, propose creating it with
    `create_project_tag`. Tags are per project, and `create_task` requires at least one.
 6. Work out the Sonar key (`hashlogics_` + repo name, or `sonar-project.properties`) and the
-   Sentry project. Ask when unsure.
+   Sentry project. Ask when unsure. Work out the **changelog mode** (decided 2026-11-03, HSM-8;
+   `reference/changelog.md`) with the CLI's `changelog`: a tool that builds the changelog
+   (release-please, semantic-release, changesets, …) gives `commits`, and wins over a file, since
+   the project's release tooling owns it (with changesets, the handoff gives the developer the
+   line for their changeset; its bump level is a release decision); a root changelog file gives `write`; with
+   neither, one question recommending yes, where anything but a clear no is `write` and a clear
+   no is `off`, never asked again. End users rarely know what changed, so the default is to keep
+   one. Hashsmith never edits versions or release headings, and creates the file only with its
+   first entry. Projects onboarded earlier get the same lookup the first time `work` needs it.
 7. **Local readiness report.** One table of checks, each reported as pass, fail or blocked:
    - project `CLAUDE.md` exists;
    - a `ship-check` skill or a test chain exists;
@@ -407,12 +418,20 @@ message), with or without their own instructions, and wants tickets.
 4. Move the ticket to In Progress. Add the `ai_tag` tag: `update_task` **replaces** all tags, so read
    the current tags first and add to them. Comment the plan.
 5. Implement it, following the project's `CLAUDE.md`, skills and patterns. Use Appendix A only
-   where the project has no pattern of its own.
+   where the project has no pattern of its own. Last, the **changelog entry** (decided
+   2026-11-03, HSM-9): in `write` mode, a `feat`, `fix` or `perf` adds one plain-English line per
+   user-visible change under `## Unreleased` (Added, Fixed, Improved), or rewrites this change's
+   line on a resume, bounce or later change. It is written before self-review so it is in the
+   reviewed diff, the saved patch and the developer's commit. A single file for now: parallel
+   branches will conflict at its top.
 6. **Self-review**, repeated until green:
    - the project's `ship-check` (or the detected chain);
    - Sonar `analyze_file_list` on the changed files: no new issues;
    - a `diff-reviewer` subagent, which gets the diff and the acceptance criteria, not Hashsmith's
-     reasoning.
+     reasoning;
+   - in changelog `write` mode, the CLI's `changelog-check`: a missing entry, ticket keys, file
+     names or code in an entry, a release heading added or a section heading removed, and a
+     changed `version` in the root `package.json`.
 
    The results go in the verification report (§8).
 7. **Handoff.**
@@ -553,6 +572,9 @@ Open questions
 - **Draft PR description**: includes the verification output, ready to paste.
 - **Commit message** (decided 2026-10-30, HSM-7): a conventional commit with every ticket key in
   its subject, ready to paste, also shown in chat. Sync finds base-branch work only by the key.
+- **Changelog line** (decided 2026-11-03, HSM-9): what happened to the changelog: the added
+  line, skipped with the reason, or built by the project's generator from the commit message.
+  None in `off` mode.
 - **Git**: a line stating that Hashsmith created the branch and ran nothing else.
 
 **Verification report** (`reference/verification-report.md`):

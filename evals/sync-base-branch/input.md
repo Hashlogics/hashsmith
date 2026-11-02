@@ -9,3 +9,7 @@ Onboarded ACME fixture with `repo.base_branch: main`, on branch main, and four t
 Developer: /hashsmith:sync
 
 Second run, on a fresh copy of the same fixture with the remote unreachable (git fetch fails).
+
+Third run: `changelog: {mode: "write", path: "CHANGELOG.md"}` in hashsmith.json, every saved
+patch touching CHANGELOG.md, and only CHANGELOG.md changed in the working tree (ACME-23's other
+files clean).

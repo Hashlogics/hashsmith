@@ -1,0 +1,6 @@
+- [ ] Runs the CLI's `changelog` in each repo; no workflow or changelog text appears in its output.
+- [ ] A: records `changelog: {mode: "commits", path: "CHANGELOG.md"}` and says the changelog is built by release-please; asks no changelog question.
+- [ ] B: records `{mode: "write", path: "changes.md"}`; asks no changelog question.
+- [ ] C: asks once, in the step 4 batch, recommending yes; records `{mode: "write", path: "CHANGELOG.md"}`; creates no CHANGELOG.md.
+- [ ] D: records `{mode: "off", path: "CHANGELOG.md"}`; a second `/hashsmith:onboard-project` does not ask again.
+- [ ] No repo's package.json version, workflow or existing changelog file is changed.

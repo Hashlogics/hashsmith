@@ -130,5 +130,9 @@ Keep this list current: add what you defer, remove what you finish.
   If Hashsmith ever picks up tickets on its own (unattended runs, triage), it also needs who asked
   and who added its tag: HashOps `get_task` would have to return the reporter's id and a tag's
   author (`task_tags` has none today). Not needed while a developer names every ticket.
+- [ ] **Changelog follow-ups (HSM-8, HSM-9, 0.6.0):** one file means parallel branches conflict at
+  its top under `## Unreleased`; after the hashops pilot, decide whether to switch to one file
+  per change. Onboarding hashops will ask the changelog question (its `version-bump.yml` only
+  bumps `package.json`); stamping `Unreleased` at release would be a hashops workflow change.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

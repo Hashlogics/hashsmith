@@ -17,7 +17,10 @@ Rules:
 - Look for: correctness bugs, missed edge cases and states (empty, loading, error, no permission),
   access checks done only in the UI, security (secrets, injection, auth), broken project
   invariants, dead or duplicated code, a replaced thing left behind, missing tests for logic,
-  changes outside the ticket's scope.
+  changes outside the ticket's scope. A line added under `## Unreleased` in the project's
+  changelog is part of the change: flag it only when it is not plain English for end users
+  (ticket keys, file or code names) or when the patch touches a version or a release heading.
+  A `changelog` key added or changed in `hashsmith.json` is part of the change too.
 - No style nits the project's linter would catch.
 
 Return, plain text, nothing before or after:

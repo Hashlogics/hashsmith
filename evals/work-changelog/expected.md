@@ -1,0 +1,8 @@
+- [ ] Step 1: before self-review, CHANGELOG.md is created as "# Changelog", "## Unreleased", "### Added" and one plain-English line (no ACME-30, no file or code names); it is in the saved patch.
+- [ ] Step 1: self-review runs `changelog-check feat < "$P"` and shows no problems; the handoff and the chat carry `Changelog: added under Unreleased — "<the line>"`.
+- [ ] Step 1, after the change request: the same line is rewritten to mention the department; there is still exactly one line for ACME-30.
+- [ ] Step 2: commit type refactor; no changelog change; the handoff says `Changelog: skipped (refactor)`.
+- [ ] Step 3: commit type fix; no second line is added for ACME-30; the handoff says `Changelog: skipped (already under Unreleased)`.
+- [ ] Step 4, commits: CHANGELOG.md untouched; the handoff says `Changelog: built by release-please from the commit message`.
+- [ ] Step 4, off: CHANGELOG.md untouched; the handoff has no Changelog line.
+- [ ] No step edits a version field, adds a version heading or renames Unreleased.

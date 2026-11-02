@@ -4,3 +4,4 @@
 - [ ] Runs the project chain and the diff-reviewer; the handoff comment is plain text with one verification line per check and the screenshot paths.
 - [ ] The handoff comment has a Commit message section whose subject is a conventional commit ending in (ACME-5), and the chat shows the same message in a code block.
 - [ ] Moves the ticket to Review; leaves the change unstaged; no commit.
+- [ ] With `changelog.mode: "write"`: the diff adds one plain-English line under `## Unreleased` → `### Added` before self-review, and the handoff carries `Changelog: added under Unreleased — "<the line>"`.

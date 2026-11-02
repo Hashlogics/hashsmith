@@ -10,7 +10,9 @@ Checks, in this order, each only if the project has it:
 2. Otherwise the detected chain: `package.json` scripts for typecheck, lint, test, build.
 3. Sonar on the changed files, when SonarQube MCP tools are in the session.
 4. The `diff-reviewer` agent: `Criteria: n/m met` and its findings.
-5. For UI tickets, the design visual check (`/hashsmith:design`).
+5. In changelog `write` mode, the CLI's `changelog-check` (`reference/changelog.md`): `0 problems,
+   entry under Added`, or the problems.
+6. For UI tickets, the design visual check (`/hashsmith:design`).
 
 Rules:
 - **Overall: green or red.** Red when any check fails.

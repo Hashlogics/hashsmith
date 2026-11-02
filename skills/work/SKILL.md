@@ -107,6 +107,11 @@ These three need no extra yes: the plan's yes covers them. Say what you did in o
 - Security-critical code (auth, permissions, payments, secrets) follows the existing pattern; if
   there is none, stop and ask (conduct 8).
 - Stay in scope. Anything else you notice becomes a note in the handoff, not a change.
+- **Changelog** (`reference/changelog.md`), last, before self-review: run the CLI's `changelog`
+  (on `ask` or `changed`, ask or record as that file says; the `hashsmith.json` edit is then part
+  of this handoff, under "Left for the developer"). Settle the commit type now. In `write` mode,
+  a `feat`, `fix` or `perf` adds one plain-English line per user-visible change under
+  `## Unreleased`, or rewrites this change's existing line. Never touch a version.
 
 If you are blocked (a decision only the developer can make, a broken local service), say so and
 ask. Offer to comment the blocker on the ticket (after a yes); the ticket stays In Progress.
@@ -116,8 +121,12 @@ ask. Offer to comment the blocker on the ticket (after a yes); the ticket stays 
 Run the checks in `reference/verification-report.md`, in its order: the project's chain
 (its ship-check skill or the commands its `CLAUDE.md` names), Sonar on the changed files when its
 tools are present, then a `diff-reviewer` agent given only the patch file (built as in step 7.1,
-so new files are in it) and the acceptance criteria. Fix every failure and every critical or
-important finding, and run the checks again. Repeat until green, or until only blocked items
+so new files are in it) and the acceptance criteria. In changelog `write` mode (no `changelog`
+key yet, as on a resume: run CLI `changelog` first, as in §5), also run CLI
+`changelog-check <type> < "$P"` on that patch. Fix every failure, every critical or important
+finding and every changelog problem, and write a missing entry, unless this change's line is
+already under Unreleased (then `Changelog: skipped (already under Unreleased)`). Run the checks
+again. Repeat until green, or until only blocked items
 remain, **three rounds at most**; after the third, hand off red with what is still failing.
 
 ## 7. Hand off
@@ -132,13 +141,13 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
 2. Write the handoff, following `reference/handoff-template.md`: what changed, how to verify (one
    step per criterion; `qa` runs these), screenshots for UI, the verification report, what is left
    for the developer, a draft PR description, the commit message (every ticket key in its
-   subject), and the git line (its base-branch form when the developer asked for the work on the
-   base branch).
+   subject), the `Changelog:` line (none in `off` mode), and the git line (its base-branch form
+   when the developer asked for the work on the base branch).
 3. Show it with the proposed move to Review and ask for one yes. Then `comment_on_task` with it
    and `move_task` to `lists.review`.
 4. Tell the developer: the changed files (`git status --short`), the verification result, the
-   handoff's commit message in a code block (ready to paste), and what to do next: review, commit
-   with that message, push and open a PR into the base branch (on the base branch: commit with it
+   handoff's commit message in a code block (ready to paste), its `Changelog:` line, and what
+   to do next: review, commit with that message, push and open a PR into the base branch (on the base branch: commit with it
    and push, no PR); then `/hashsmith:next` moves the ticket to QA.
 
 ## 8. Changes after handoff
@@ -146,7 +155,8 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
 If the developer asks for changes in the same session, make them, run step 6 again, then update
 the saved patch, and offer a short "Handoff updated" comment with what changed, the new
 verification lines and the commit message, rewritten to cover the whole change (posted after a
-yes). The ticket stays in Review.
+yes). Rewrite this change's line under Unreleased (§5) and the handoff's `Changelog:` line too.
+The ticket stays in Review.
 
 ## 9. Lessons and config
 

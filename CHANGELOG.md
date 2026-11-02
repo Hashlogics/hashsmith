@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.6.0 — 2026-11-03
+
+- Hashsmith keeps a plain-English changelog for your users: `/hashsmith:work` adds a line under
+  Unreleased for each feature, fix or speed-up, and never touches versions. Onboarding asks once
+  when a project has none, and leaves it alone when a tool builds it from commits.
+- Update before pulling a `hashsmith.json` with a `changelog` key: older versions reject it.
+
 ## 0.5.4 — 2026-10-30
 
 - `/hashsmith:onboard-project` checks the links of the projects named like your repo first, and

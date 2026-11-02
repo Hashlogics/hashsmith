@@ -3,3 +3,4 @@
 - [ ] ACME-23 stays in Review, reported as still in the working tree (uncommitted).
 - [ ] ACME-24 is not reported as in the working tree, although the tree is dirty with ACME-23's files.
 - [ ] Second run: the summary starts with "git fetch failed: …; states may be stale".
+- [ ] With `changelog.mode: "write"` and only CHANGELOG.md dirty on main (every patch touches it), no ticket is reported as still in the working tree.
