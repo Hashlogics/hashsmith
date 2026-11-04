@@ -112,6 +112,32 @@ describe("project candidates", () => {
   });
 });
 
+describe("lists before To Do", () => {
+  const L = (n, name, type = "active") => ({ id: U(n), name, type });
+  const mapped = { todo: U(3), in_progress: U(4), review: U(6), qa: U(7), done: U(8) };
+  const board = [L(1, "Icebox"), L(2, "Backlog"), L(3, "To Do"), L(4, "In Progress"), L(5, "Blocked"), L(6, "Review"), L(7, "QA"), L(8, "Done", "closed")];
+  it("returns the active lists that come before To Do, in board order, whatever their names", () => {
+    assert.deepEqual(cli.listsBeforeTodo(board, mapped), { lists: [{ id: U(1), name: "Icebox" }, { id: U(2), name: "Backlog" }] });
+    const renamed = [L(1, "Ideas"), L(2, "Parking lot"), L(3, "Ready")];
+    assert.deepEqual(cli.listsBeforeTodo(renamed, mapped).lists.map(l => l.name), ["Ideas", "Parking lot"]);
+  });
+  it("leaves out lists after To Do, done and closed lists, and lists hashsmith.json maps", () => {
+    const odd = [L(1, "Archive", "closed"), L(9, "Shipped", "done"), L(7, "QA"), L(2, "Backlog", null), L(3, "To Do"), L(5, "Blocked")];
+    assert.deepEqual(cli.listsBeforeTodo(odd, mapped).lists.map(l => l.name), ["Backlog"], "a list without a type counts as active");
+    assert.deepEqual(cli.listsBeforeTodo([L(3, "To Do"), L(2, "Backlog")], mapped), { lists: [] });
+  });
+  it("errors when To Do is not on the board, or the input has the wrong shape", () => {
+    assert.match(cli.listsBeforeTodo([L(1, "Backlog"), L(2, "Todo")], mapped).error, /To Do list .* not on this board/);
+    assert.match(cli.listsBeforeTodo(board, {}).error, /hashops\.lists\.todo/);
+    assert.match(cli.listsBeforeTodo(board, null).error, /hashops\.lists\.todo/);
+    assert.match(cli.listsBeforeTodo("not an array", mapped).error, /lists/);
+  });
+  it("skips rows without an id or a name, and keeps names as given", () => {
+    const rows = [null, { name: "No id" }, { id: U(9) }, "Backlog", L(1, "$(touch pwned)"), L(3, "To Do")];
+    assert.deepEqual(cli.listsBeforeTodo(rows, mapped), { lists: [{ id: U(1), name: "$(touch pwned)" }] });
+  });
+});
+
 describe("env key names", () => {
   it("reads names only, skipping comments and commented-out keys", () => {
     assert.deepEqual(envKeyNames("# A=1\nexport B=2\nC=\n#D=4\n"), ["B", "C"]);
@@ -563,6 +589,23 @@ describe("CLI", () => {
     assert.match(JSON.parse(missing.stdout).error, /changelog/);
     const badType = run(["feature"], { hashops, changelog: { mode: "write", path: "CHANGELOG.md" } });
     assert.equal(badType.status, 2);
+  });
+  it("lists-before-todo reads get_board's lists on stdin and the To Do id from hashsmith.json at the repo top", () => {
+    const dir = fixtureRepo();
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ hashops: { lists: { todo: U(2), done: U(3) } } }));
+    mkdirSync(join(dir, "sub"));
+    const lists = [{ id: U(1), name: "Backlog", type: "active" }, { id: U(2), name: "To Do", type: "active" }, { id: U(3), name: "Done", type: "closed" }];
+    const run = input => spawnSync(process.execPath, [CLI, "lists-before-todo"], { cwd: join(dir, "sub"), encoding: "utf8", input });
+    for (const input of [JSON.stringify(lists), JSON.stringify({ lists }), JSON.stringify({ result: { id: U(9), name: "Board", lists } })]) {
+      const r = run(input);
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.deepEqual(JSON.parse(r.stdout), { lists: [{ id: U(1), name: "Backlog" }] }, input);
+    }
+    for (const bad of ["not json", "", '{"data": []}']) {
+      const r = run(bad);
+      assert.equal(r.status, 2, bad);
+      assert.ok(JSON.parse(r.stdout).error, bad);
+    }
   });
   it("an unknown command exits 2 with usage", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });

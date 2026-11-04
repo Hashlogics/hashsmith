@@ -4,6 +4,12 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.6.1 — 2026-11-05
+
+- `/hashsmith:next` also reads the lists before To Do (Backlog, or whatever your board calls them):
+  it counts them, and when To Do is empty it offers their top ticket, moving it to To Do on your
+  yes.
+
 ## 0.6.0 — 2026-11-03
 
 - Hashsmith keeps a plain-English changelog for your users: `/hashsmith:work` adds a line under

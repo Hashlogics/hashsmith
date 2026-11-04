@@ -3,4 +3,5 @@
 - [ ] C reminds the developer to commit, push and open a PR for ACME-9, and offers ACME-8 as the alternative.
 - [ ] D recommends /hashsmith:work ACME-8 and names ACME-10 and ACME-11 as alternatives.
 - [ ] E says the board is empty and offers /hashsmith:intake.
+- [ ] F runs `lists-before-todo` with the lists on stdin (a quoted heredoc), shows `Icebox 1 · Backlog 2 · To Do 0 · …` and recommends ACME-13 from Backlog, naming ACME-14 and ACME-12; Blocked (after To Do) is not offered. On the yes it moves ACME-13 to To Do, says so, then runs /hashsmith:work ACME-13.
 - [ ] Every run shows the one-line status and asks one question; nothing starts without a yes.

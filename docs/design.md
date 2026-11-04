@@ -164,7 +164,7 @@ list ids are stored in `hashsmith.json`.
 | Column | Meaning | Who moves the ticket in |
 | --- | --- | --- |
 | Backlog | Not yet prioritised. Hashsmith never moves tickets here | humans |
-| To Do | Ready to be worked on | `intake`, `triage`, a human, or a QA failure |
+| To Do | Ready to be worked on | `intake`, `triage`, a human, a QA failure, or `next` when the developer picks a ticket from a list before To Do |
 | In Progress | Hashsmith is working on it right now | `work` |
 | Review | The developer's review: Hashsmith has handed off, and the change is unstaged on its branch | `work` |
 | QA | The developer accepted it: a PR exists | `sync` |
@@ -488,6 +488,15 @@ QA never runs against production: the app's URL and the backend it talks to must
 Checks onboarding, runs `sync`, counts the board's lists, and proposes in this order: fix a QA
 bounce, QA what is waiting, finish a handoff, work the next To Do ticket, intake. It starts nothing
 without a yes.
+
+**Lists before To Do (decided 2026-11-05, HSM-13).** `next` also reads every active list that comes
+before To Do on the board, whatever it is called (Backlog, Icebox, Ideas), and leaves out the lists
+`hashops.lists` maps. They are found at run time (the CLI's `lists-before-todo`, from `get_board`'s
+lists, which come in board order), not stored in `hashsmith.json`, so a board's own names and
+older plugin versions both keep working. The status line counts them; when To Do is empty, `next`
+offers their top ticket by priority, and choosing it moves it to To Do before `work` starts.
+`sync` is unchanged: nothing before To Do is in flight. Without this, an empty To Do read as "no
+work" while Backlog, where `feedback` files its reports, held tickets.
 
 ### `design`
 

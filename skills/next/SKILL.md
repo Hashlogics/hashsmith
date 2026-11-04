@@ -20,10 +20,19 @@ Run `/hashsmith:sync`. Its moves are confirmed inside it.
 
 ## 3. Read the board
 
-`list_tasks` with `limit: 60` for the board's To Do, In Progress, Review and QA lists (list names
-from `get_board` for the ids in `hashops.lists`). It returns no tags and sorts by last update, not
-priority. Count the tickets per list (sync already told you which in flight are Hashsmith's), and
-in To Do note:
+**Lists before To Do.** Teams keep unready tickets in lists before To Do, under any name (Backlog,
+Icebox, Ideas). Pass `get_board`'s `lists` to the CLI's `lists-before-todo` as JSON on stdin,
+through a quoted heredoc so no name is on the command line: `node "<cli>" lists-before-todo
+<<'EOF'` / `[{"id": …, "name": …, "type": …}, …]` / `EOF`. It prints the active ones that come
+before To Do and are not in `hashops.lists`. An `error` that To Do is not on this board means
+stale ids: say so and propose `/hashsmith:onboard-project`; any other `error` means the input was
+wrong: run it again with `get_board`'s `lists`.
+
+`list_tasks` with `limit: 60` for those lists and for To Do, In Progress, Review and QA (list
+names from `get_board` for the ids in `hashops.lists`). It returns no tags and sorts by last
+update, not priority. Count the tickets per list (sync already told you which in flight are
+Hashsmith's). When To Do is empty, note the top three tickets across the lists before To Do by
+priority, each with its list's name. In To Do note:
 - **QA bounces:** run the CLI's `ticket-state` for the To Do keys. A To Do ticket that has an
   `ai/*` branch was handed off before; `get_task` it, and it is a bounce when its last comment
   starts "QA failed (Hashsmith)";
@@ -35,10 +44,11 @@ developer, and Hashsmith cannot switch branches until it is committed.
 
 ## 4. Propose
 
-Show a short status (`To Do 6 (1 QA bounce) · In Progress 0 · Review 2 · QA 1`), then offer the
-choices that apply, in this order; the first one that applies is the recommendation. **When the
-tree is not clean, choice 3 comes first**, and choices 1, 2 and 4 are shown as "needs a clean
-tree": `work` and `qa` both stop on uncommitted changes.
+Show a short status, the lists before To Do first under their own names (`Backlog 3 · To Do 6
+(1 QA bounce) · In Progress 0 · Review 2 · QA 1`), then offer the choices that apply, in this
+order; the first one that applies is the recommendation. **When the tree is not clean, choice 3
+comes first**, and choices 1, 2 and 4 are shown as "needs a clean tree": `work` and `qa` both
+stop on uncommitted changes.
 
 1. **Fix a QA bounce:** `/hashsmith:work <KEY>`. A failed QA blocks the release of that work.
 2. **QA what's waiting:** `/hashsmith:qa` for tickets in QA (an open PR, or a pushed commit on
@@ -47,11 +57,14 @@ tree": `work` and `qa` both stop on uncommitted changes.
 3. **Finish a handoff:** tickets in Review whose branch has no PR yet. Remind the developer to
    review, commit, push and open a PR; nothing for Hashsmith to do until then.
 4. **Work the next ticket:** `/hashsmith:work <KEY>` for the top To Do ticket, naming the next two
-   as alternatives.
+   as alternatives. When To Do is empty, the top ticket from the lists before To Do instead,
+   naming its list and the next two: choosing it is the yes to `move_task` it to `lists.todo`
+   (say so in one line), then run `work`. Only on a clean tree: otherwise nothing moves.
 5. **New requirements:** `/hashsmith:intake`, when the developer has notes, a doc, a Slack thread
    or a meeting to turn into tickets.
 
 Ask in one question with these options and the recommendation's one-line reason. The developer's
 free text overrides the menu ("do ACME-9", "intake this: …"). Then run the chosen skill.
 
-When the board is empty and nothing is waiting, say so and offer intake.
+When the board is empty (the lists before To Do too) and nothing is waiting, say so and offer
+intake.

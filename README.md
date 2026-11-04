@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.6.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.6.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -67,7 +67,7 @@ review every change and do the commit, the push and the PR yourself.
    access. You need this even if you already connected HashOps another way (for example
    `peoplemuster` from the in-app Connect dialog): Hashsmith has its own connection, so that its
    project guard applies. Keep the other one for your own use.
-4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.6.0`.
+4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.6.1`.
 
 Optional tools you install yourself (Hashsmith does not declare them, so you never run two
 copies): a SonarQube MCP server (issues on changed files during self-review) and the official
@@ -103,7 +103,7 @@ always just say what you want instead.
 
 | Command | What it does |
 | --- | --- |
-| `/hashsmith:next` | Reads the board and proposes, in this order: fix a QA bounce, QA what's waiting, finish a handoff, work the next ticket, or intake |
+| `/hashsmith:next` | Reads the board and proposes, in this order: fix a QA bounce, QA what's waiting, finish a handoff, work the next ticket (from a list before To Do, such as Backlog, when To Do is empty), or intake |
 | `/hashsmith:intake` | Paste notes, a doc or a Slack thread, or name a HashOps meeting. Hashsmith reads the code, checks the board for duplicates, asks its questions once, shows draft tickets, and creates them in To Do after your yes |
 | `/hashsmith:work [KEY-12]` | Briefs you on the ticket in plain words, then plans it and waits for your yes. Then it creates `ai/KEY-12-…` (you approve), implements, runs the project's checks and a fresh-eyes review until green, and hands off in Review with the change unstaged |
 | `/hashsmith:sync` | Moves tickets to match git, after your yes: Review → QA once the PR is open |

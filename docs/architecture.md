@@ -111,6 +111,7 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | --- | --- | --- |
 | `repo-slug` (JSON array of link URLs on stdin) | `origin`, a slug per URL, and `matches` | `onboard-project` |
 | `project-candidates` (JSON array of `list_my_projects` rows on stdin) | `probes` (the folder and origin repo names) and up to five `candidates` named like them, exact before partial | `onboard-project` |
+| `lists-before-todo` (`get_board`'s lists on stdin) | the active lists before To Do in board order (Backlog, Icebox: any name), not mapped in `hashops.lists` | `next` |
 | `env-keys` | `.env.example` key names that the local env files lack (names only, never values) | `onboard-project` |
 | `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
 | `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
@@ -120,8 +121,8 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | `changelog-check TYPE` (the handoff patch on stdin) | in `write` mode: `needs_entry` and `heading` for the commit type, `missing_entry`, and `problems` (ticket keys, file names or code in an entry, a release heading added or a section heading removed in the changelog, a changed `version` in the root `package.json`) | `work` |
 | `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
 
-Link URLs come from HashOps, where any project lead can store one, so they are read from stdin and
-never placed on a shell command line.
+Link URLs, project names and list names come from HashOps, where any project lead can set one, so
+they are read from stdin and never placed on a shell command line.
 
 ### MCP servers: the outside world
 

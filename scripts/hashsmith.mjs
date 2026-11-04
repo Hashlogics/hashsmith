@@ -5,6 +5,7 @@
 //
 //   repo-slug            origin and the link URLs (a JSON array on stdin) as slugs, and which match
 //   project-candidates   the projects (list_my_projects rows, a JSON array on stdin) named like this repo, best first
+//   lists-before-todo    the board's active lists before To Do (get_board's lists on stdin), not mapped in hashsmith.json
 //   env-keys             .env.example key names that .env / .env.local lack (names only, never values)
 //   git-switch           how .claude/settings(.local).json treat `git switch`
 //   check-config         validate hashsmith.json (exit 1 when invalid)
@@ -80,6 +81,22 @@ export function projectCandidates(projects, probes) {
     .sort((a, b) => a.best - b.best) // stable: equals keep list_my_projects order
     .slice(0, CANDIDATE_MAX)
     .map(r => r.row);
+}
+
+// The lists a team keeps tickets in before they are ready (Backlog, Icebox, Ideas: any name): the
+// active lists that come before To Do in board order (get_board sorts by position), leaving out
+// the ones hashsmith.json maps. next reads them, so an empty To Do is not mistaken for no work.
+// HashOps list types are active, done and closed; a list without a type counts as active.
+export function listsBeforeTodo(lists, mapped) {
+  const todo = mapped?.todo;
+  if (typeof todo !== "string" || !todo) return { error: "hashops.lists.todo is missing from hashsmith.json" };
+  if (!Array.isArray(lists)) return { error: "stdin must be get_board's lists: a JSON array, or the board with its lists" };
+  const rows = lists.filter(l => typeof l?.id === "string" && typeof l?.name === "string");
+  const at = rows.findIndex(l => l.id === todo);
+  if (at === -1) return { error: "The To Do list in hashsmith.json is not on this board: run /hashsmith:onboard-project to refresh the ids" };
+  const known = new Set(Object.values(mapped));
+  const active = l => l.type == null || l.type === "active";
+  return { lists: rows.slice(0, at).filter(l => active(l) && !known.has(l.id)).map(({ id, name }) => ({ id, name })) };
 }
 
 /** Names of the KEY= lines in an env file. Comments, blank lines and `# KEY=` are skipped. */
@@ -453,6 +470,18 @@ const COMMANDS = {
     if (!Array.isArray(projects)) return { error: "stdin must be a JSON array of list_my_projects rows" };
     const probes = repoProbes(basename(top), originUrl);
     return { probes, candidates: projectCandidates(projects, probes) };
+  },
+  // List names come from HashOps too: stdin only. Takes the lists array, or the board around it.
+  "lists-before-todo": () => {
+    const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
+    let board;
+    try {
+      board = JSON.parse(input);
+    } catch {
+      return { error: "stdin must be get_board's lists: a JSON array, or the board with its lists" };
+    }
+    const lists = Array.isArray(board) ? board : (board?.result?.lists ?? board?.lists);
+    return listsBeforeTodo(lists, tryJson(join(repoTop(), "hashsmith.json"))?.hashops?.lists);
   },
   "env-keys": () => {
     const example = tryRead(".env.example");
