@@ -86,6 +86,9 @@ an error to retry: note it, carry on, and list it under "ask a project lead" in 
   `origin/HEAD`), ask. Ask too if the two disagree.
 - `qa.base_url`: `http://localhost:<port>` from the dev script in `package.json` or the
   dev-server config (for example the Vite `server.port`). Ask if neither names a port.
+- `qa.mode`: `browser` with a `base_url`. A project with no web UI (no dev server, nothing to
+  open in a browser: a CLI, a library, a plugin) gets `"qa": {"base_url": "", "mode": "code"}`,
+  so `qa` checks its code and tests instead; ask when unsure.
 - `sonar.project_key`: `sonar.projectKey` from `sonar-project.properties`, else propose
   `hashlogics_<repo folder name>`.
 - `sentry.project`: only when the session has Sentry MCP tools; find it with them. Otherwise
@@ -109,9 +112,9 @@ Blocked means it could not run; it is never a pass (conduct 7).
 | Branch creation allowed | CLI `git-switch`: `ask` passes; `deny` fails: "move `Bash(git switch *)` from deny to ask in `.claude/settings.json`; keep `git checkout *` denied" |
 | Local stack | only if `supabase/config.toml` exists: `npx supabase status` exits 0; otherwise blocked with "run `npx supabase start`" |
 | Env keys | CLI `env-keys`: list missing names as "check these" (never read env files yourself) |
-| Test users per role | the project's seeding script (for example `npm run dev:local-users`) is named; blocked until it has been run on the current local database |
-| Mail catcher | the mail URL from `npx supabase status` answers `curl -sf` |
-| MCPs | hashops: pass. Browser (Playwright tools present): needed by design and qa. SonarQube and Sentry: "installed" or "not installed (optional)" |
+| Test users per role | with `qa.mode` `code`: "not needed (qa.mode code)". Otherwise the project's seeding script (for example `npm run dev:local-users`) is named; blocked until it has been run on the current local database |
+| Mail catcher | with `qa.mode` `code`: "not needed (qa.mode code)". Otherwise the mail URL from `npx supabase status` answers `curl -sf` |
+| MCPs | hashops: pass. Browser (Playwright tools present): needed by design and by qa in browser mode. SonarQube and Sentry: "installed" or "not installed (optional)" |
 
 If the project has no `CLAUDE.md`, offer to draft one from the code as it is (structure, commands,
 patterns you can point at). Never draft it from `reference/standards.md`: a draft describes the

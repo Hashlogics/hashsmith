@@ -209,6 +209,28 @@ describe("checkConfig", () => {
       assert.equal(checkConfig(c).length, 1, url);
     }
   });
+  it("accepts qa.mode browser, code, \"\" or absent, and nothing else", () => {
+    for (const mode of ["browser", "code", "", undefined]) {
+      const c = valid();
+      if (mode !== undefined) c.qa.mode = mode;
+      assert.deepEqual(checkConfig(c), [], String(mode));
+    }
+    for (const mode of ["Code", "api", 1, null]) {
+      const c = valid();
+      c.qa.mode = mode;
+      assert.equal(checkConfig(c).length, 1, String(mode));
+    }
+  });
+  it("reports a bad qa.base_url and a bad qa.mode together", () => {
+    const c = valid();
+    c.qa = { base_url: "https://staging.acme.com", mode: "api" };
+    assert.equal(checkConfig(c).length, 2);
+  });
+  it("accepts code mode with an empty base_url", () => {
+    const c = valid();
+    c.qa = { base_url: "", mode: "code" };
+    assert.deepEqual(checkConfig(c), []);
+  });
   it("accepts any key HashOps can generate, including a leading digit", () => {
     const c = valid();
     c.hashops.project_key = "3DS";
@@ -453,10 +475,13 @@ describe("work on the base branch", () => {
       pr: null,
       state: "base-pushed",
       ambiguous: false,
-      base: { branch: "main", pushed: "a1b2c3d", pushed_at: "2026-10-29T10:00:00+05:00", local: "a1b2c3d", local_at: "2026-10-29T10:00:00+05:00" },
+      base: { branch: "main", pushed: "a1b2c3d", pushed_at: "2026-10-29T10:00:00+05:00", local: "a1b2c3d", local_at: "2026-10-29T10:00:00+05:00", pushed_commits: ["a1b2c3d"] },
     });
+    const two = cli.baseStateFor("main", [c("f00d123", "2026-10-30T10:00:00+05:00"), c("a1b2c3d", "2026-10-29T10:00:00+05:00")], []);
+    assert.equal(two.base.pushed, "f00d123", "pushed is still the newest");
+    assert.deepEqual(two.base.pushed_commits, ["a1b2c3d", "f00d123"], "every pushed commit, oldest first, for qa's code review");
     assert.equal(cli.baseStateFor("main", [], [c("e5f6a7b", "x")]).state, "base-local");
-    assert.deepEqual(cli.baseStateFor("main", [], []).base, { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null });
+    assert.deepEqual(cli.baseStateFor("main", [], []).base, { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null, pushed_commits: [] });
     assert.equal(cli.baseStateFor("main", [], []).state, "no-branch");
   });
   it("says when no base branch was searched", () => {
@@ -554,7 +579,7 @@ describe("CLI", () => {
     const r = spawnSync(process.execPath, [CLI, "ticket-state", "ACME-1"], { cwd: dir, encoding: "utf8" });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.deepEqual(JSON.parse(r.stdout)["ACME-1"], {
-      branch: null, pr: null, state: "no-branch", ambiguous: false, base: { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null },
+      branch: null, pr: null, state: "no-branch", ambiguous: false, base: { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null, pushed_commits: [] },
     });
   });
   it("changelog reads the repo's top level and prints names only, never file text", () => {

@@ -4,6 +4,12 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.6.2 — 2026-11-05
+
+- `/hashsmith:qa` works for projects with no web UI (CLIs, libraries, plugins): it runs the
+  project's checks and reviews each acceptance criterion against the ticket's code, with file and
+  line evidence, instead of opening a browser. Onboarding records it as `qa.mode: "code"`.
+
 ## 0.6.1 — 2026-11-05
 
 - `/hashsmith:next` also reads the lists before To Do (Backlog, or whatever your board calls them):

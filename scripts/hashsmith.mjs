@@ -126,6 +126,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TICKET = /^[A-Z0-9]+-\d+$/;
 const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "learned"];
 const CHANGELOG_MODES = ["write", "commits", "off"];
+const QA_MODES = ["browser", "code", ""];
 const LISTS = ["todo", "in_progress", "review", "qa", "done"];
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string";
@@ -159,6 +160,9 @@ export function checkConfig(c) {
   // QA and design screenshots run only against a local app (design §6 qa).
   if (c.qa !== undefined && !(isObj(c.qa) && isStr(c.qa.base_url) && (c.qa.base_url === "" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/\S*)?$/.test(c.qa.base_url))))
     e.push('qa.base_url must be "" or a local URL (http://localhost:<port> or http://127.0.0.1:<port>).');
+  // How qa verifies: in the browser, or by code and tests for a project with no web UI; "" asks.
+  if (isObj(c.qa) && "mode" in c.qa && !QA_MODES.includes(c.qa.mode))
+    e.push('qa.mode must be "browser", "code" or "".');
   if (c.sonar !== undefined && !(isObj(c.sonar) && isStr(c.sonar.project_key))) e.push("sonar.project_key must be a string.");
   if (c.sentry !== undefined && !(isObj(c.sentry) && isStr(c.sentry.project))) e.push("sentry.project must be a string.");
   // A Markdown file at the repo root only: entries are written there, and sync leaves it out of
@@ -375,7 +379,8 @@ export function commitsForKey(log, key) {
 }
 
 /** A key with no ai/* branch, from commits carrying it on origin/<base> and on the local <base>
- *  (newest first): base-pushed beats base-local; neither stays no-branch (design §4). No base
+ *  (newest first): base-pushed beats base-local; neither stays no-branch (design §4).
+ *  `pushed_commits` lists every pushed one, oldest first. No base
  *  branch in the config: `base: null`, so nobody reads "not found" into "not searched". */
 export function baseStateFor(base, pushed, local) {
   const none = { branch: null, pr: null, state: "no-branch", ambiguous: false };
@@ -384,7 +389,14 @@ export function baseStateFor(base, pushed, local) {
   return {
     ...none,
     state,
-    base: { branch: base, pushed: pushed[0]?.sha ?? null, pushed_at: pushed[0]?.at ?? null, local: local[0]?.sha ?? null, local_at: local[0]?.at ?? null },
+    base: {
+      branch: base,
+      pushed: pushed[0]?.sha ?? null,
+      pushed_at: pushed[0]?.at ?? null,
+      local: local[0]?.sha ?? null,
+      local_at: local[0]?.at ?? null,
+      pushed_commits: pushed.map(c => c.sha).reverse(), // oldest first: the ticket's code, for qa's code mode
+    },
   };
 }
 

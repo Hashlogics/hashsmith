@@ -116,7 +116,7 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 | `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
 | `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
-| `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base) and `base-pushed` / `base-local` | `sync`, `next`, `qa` |
+| `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base, plus `pushed_commits`: every pushed one, oldest first) and `base-pushed` / `base-local` | `sync`, `next`, `qa` |
 | `changelog` | the changelog `mode` and `path` to use (stored, else detected from the repo's root files, `package.json` and workflows; tool and file names only), the `generator`, `ask` (nothing stored or found) and `changed` (write it to `hashsmith.json`) | `onboard-project`, `work` |
 | `changelog-check TYPE` (the handoff patch on stdin) | in `write` mode: `needs_entry` and `heading` for the commit type, `missing_entry`, and `problems` (ticket keys, file names or code in an entry, a release heading added or a section heading removed in the changelog, a changed `version` in the root `package.json`) | `work` |
 | `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
@@ -173,7 +173,9 @@ runs before `work`, `intake` and `next`.
    approves), refuses a branch that differs from origin, and logs in as the role's test user with the code from the local mail catcher. It
    runs each criterion in Playwright and uploads the screenshots through a signed URL (`curl`),
    so the bytes never enter the model. On pass the ticket goes to Done; on fail, back to To Do
-   with the failing steps.
+   with the failing steps. With `qa.mode` `code` (no web UI) it runs the project's checks instead,
+   gives the ticket's patch and criteria to a `diff-reviewer`, and reports each criterion with
+   path:line evidence; nothing is attached, and steps needing a live run are blocked.
 
 ## 6. Testing
 

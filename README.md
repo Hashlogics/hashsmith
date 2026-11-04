@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.6.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.6.2** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -108,7 +108,7 @@ always just say what you want instead.
 | `/hashsmith:work [KEY-12]` | Briefs you on the ticket in plain words, then plans it and waits for your yes. Then it creates `ai/KEY-12-…` (you approve), implements, runs the project's checks and a fresh-eyes review until green, and hands off in Review with the change unstaged |
 | `/hashsmith:sync` | Moves tickets to match git, after your yes: Review → QA once the PR is open |
 | `/hashsmith:design` | Designs or polishes a screen. Your project's design rules come first, then your own, then Hashsmith's taste kit. It takes screenshots at desktop and mobile widths and does up to three critique rounds. `work` runs it for UI tickets |
-| `/hashsmith:qa [KEY-12]` | On your local app only: switches to the PR branch (you approve) and logs in as the right test user. Then it runs each acceptance criterion with screenshots attached to the ticket, and moves the ticket to Done or back to To Do with the failing steps |
+| `/hashsmith:qa [KEY-12]` | On your local app only: switches to the PR branch (you approve) and logs in as the right test user. Then it runs each acceptance criterion with screenshots attached to the ticket, and moves the ticket to Done or back to To Do with the failing steps. A project with no web UI is checked against its code and tests instead |
 | `/hashsmith:feedback [what went wrong]` | Files one ticket per point on the Hashsmith board's Backlog, with you as the reporter, after your yes. Written in general terms (no client, project or code specifics), with a concrete before/after edit to the skill. Works in any repo |
 | `/hashsmith:onboard-project` | Set up or refresh the project's `hashsmith.json` |
 

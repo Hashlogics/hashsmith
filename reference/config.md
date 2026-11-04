@@ -19,7 +19,7 @@ a token or an email (`config-guard.mjs` blocks them). Validate after every write
     "ai_tag": "hashsmith"
   },
   "repo": { "base_branch": "dev" },      // what ai/* branches are cut from and PRs target
-  "qa": { "base_url": "http://localhost:8080" },
+  "qa": { "base_url": "http://localhost:8080", "mode": "browser" },  // mode: browser | code | "" (ask)
   "sonar": { "project_key": "hashlogics_hashops" },
   "sentry": { "project": "…" },
   "changelog": { "mode": "write", "path": "CHANGELOG.md" },  // write | commits | off (reference/changelog.md)
@@ -97,6 +97,7 @@ JWTs, `sk_`, `ghp_`, `xox[abp]-` and `-----BEGIN` patterns; learned key names co
 | `hashops.ai_tag` | `hashsmith`, created with `create_project_tag` when `list_project_tags` lacks it |
 | `repo.base_branch` | the PR target in the project's CLAUDE.md, else `git rev-parse --abbrev-ref origin/HEAD` |
 | `qa.base_url` | `http://localhost:<port>` from the dev script or dev-server config |
+| `qa.mode` | `code` when the project has no web UI (no dev server, nothing to open in a browser; `base_url` stays `""`), else `browser`; asked when unclear |
 | `sonar.project_key` | `sonar-project.properties`, else `hashlogics_<repo>` |
 | `sentry.project` | the Sentry tools' project list, only when the session has them |
 | `changelog.mode`, `path` | the CLI's `changelog`: a tool that builds it from commits → `commits`; else a root `CHANGELOG.md` / `CHANGES.md` / `HISTORY.md` → `write`; else one question, where anything but a clear no is `write` (`reference/changelog.md`). A stored `write` turns stale once a generator appears; `off` always stands |
