@@ -8,6 +8,8 @@ Read before changing anything:
 - `docs/design.md`: the spec and every decision behind it. Read the relevant section before
   changing behaviour, and update it when a decision changes.
 - `docs/plans/`: implementation plans, newest last.
+- `docs/architecture.md` §7 "Draft or test a skill's wording": before using `skill-creator` on a
+  skill here.
 
 ## Commands
 
