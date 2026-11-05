@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -69,6 +69,29 @@ describe("repoMatches", () => {
   it("never matches when the origin is missing or unparsable", () => {
     assert.deepEqual(cli.repoMatches(null, ["nope", "https://github.com/org/app"]), []);
     assert.deepEqual(cli.repoMatches("nope", ["nope"]), []);
+  });
+});
+
+describe("repo match", () => {
+  it("is null when the ticket names no repository, so an untagged ticket is anyone's", () => {
+    assert.deepEqual(cli.repoMatch(["feedback", "ai"], ["acmeweb"]), { repos: [], match: null, others: [] });
+    assert.equal(cli.repoMatch(undefined, ["acmeweb"]).match, null);
+  });
+  it("matches repo:<name> tags against this repo's probes, ignoring case and punctuation", () => {
+    assert.deepEqual(cli.repoMatch(["repo:Acme-Web", "ui"], ["acmeweb"]), { repos: ["Acme-Web"], match: true, others: [] });
+    assert.deepEqual(cli.repoMatch(["REPO: acme_api"], ["acmeweb"]), { repos: ["acme_api"], match: false, others: ["acme_api"] });
+  });
+  it("names the other repositories of a ticket that spans several", () => {
+    assert.deepEqual(cli.repoMatch(["repo:acme-web", "repo:acme-api"], ["acmeweb", "web"]), { repos: ["acme-web", "acme-api"], match: true, others: ["acme-api"] });
+  });
+  it("ignores tags that only look like one, and non-strings", () => {
+    assert.deepEqual(cli.repoMatch(["repo:", "repository:x", "my-repo:x", 7, null], ["x"]), { repos: [], match: null, others: [] });
+  });
+  it("takes the tags array, or get_task's result around it", () => {
+    assert.deepEqual(cli.tagsFrom({ result: { tags: ["repo:x"] } }), ["repo:x"]);
+    assert.deepEqual(cli.tagsFrom({ tags: ["repo:x"] }), ["repo:x"]);
+    assert.deepEqual(cli.tagsFrom(["repo:x"]), ["repo:x"]);
+    assert.equal(cli.tagsFrom({ result: {} }), null);
   });
 });
 
@@ -221,6 +244,18 @@ describe("checkConfig", () => {
       assert.equal(checkConfig(c).length, 1, String(mode));
     }
   });
+  it("accepts repo.branch_policy managed, current, confirm, \"\" or absent, and nothing else", () => {
+    for (const policy of ["managed", "current", "confirm", "", undefined]) {
+      const c = valid();
+      if (policy !== undefined) c.repo.branch_policy = policy;
+      assert.deepEqual(checkConfig(c), [], String(policy));
+    }
+    for (const policy of ["Current", "manual", 1, null]) {
+      const c = valid();
+      c.repo.branch_policy = policy;
+      assert.deepEqual(checkConfig(c), ['repo.branch_policy must be "managed", "current", "confirm" or "" (managed).'], String(policy));
+    }
+  });
   it("reports a bad qa.base_url and a bad qa.mode together", () => {
     const c = valid();
     c.qa = { base_url: "https://staging.acme.com", mode: "api" };
@@ -273,6 +308,10 @@ describe("changelog mode", () => {
     assert.equal(detect([], { devDependencies: { "@changesets/cli": "2" } }).generator, "changesets");
     assert.equal(detect([], { scripts: { release: "commit-and-tag-version" } }).generator, "commit-and-tag-version");
     assert.equal(detect([], { release: { branches: ["main"] } }).generator, "semantic-release");
+    assert.equal(detect([], { release: "2026.11" }).generator, null, "a release key that is not a config object is not semantic-release");
+    assert.equal(detect([], { devDependencies: { "conventional-changelog-conventionalcommits": "8" } }).generator, null, "a commitlint preset is not the tool");
+    assert.equal(detect([], { devDependencies: { "conventional-changelog-cli": "5" } }).generator, "conventional-changelog");
+    assert.equal(detect([], { scripts: { changelog: "conventional-changelog -p angular -i CHANGELOG.md -s" } }).generator, "conventional-changelog");
     assert.equal(detect([], { scripts: { build: "vite build" }, dependencies: { react: "18" } }).generator, null);
     assert.equal(detect([], { __invalid: true }).generator, null);
     assert.equal(detect([".release-it.json"], { "release-it": { git: {} } }).generator, null, "release-it alone writes no changelog");
@@ -281,6 +320,7 @@ describe("changelog mode", () => {
   });
   it("finds a generator in a workflow, and not in a workflow that only bumps the version", () => {
     assert.equal(detect([], null, ["steps:\n  - uses: googleapis/release-please-action@v4\n"]).generator, "release-please");
+    assert.equal(detect([], null, ["steps:\n  - uses: TriPSs/conventional-changelog-action@v5\n"]).generator, "conventional-changelog");
     assert.equal(detect([], null, ["run: npm version patch --no-git-tag-version\n# once per release, items\n"]).generator, null);
   });
 
@@ -307,6 +347,44 @@ describe("changelog check", () => {
   const patch = (path, body, header = "") => `diff --git a/${path} b/${path}\n${header}--- a/${path}\n+++ b/${path}\n@@ -1,3 +1,4 @@\n${body}`;
   const code = patch("src/a.ts", "+export const a = 1;\n-export const a = 0;\n");
   const check = (type, p) => cli.changelogCheck(type, p, "CHANGELOG.md");
+  it("calls a heading a release heading only for a version, a date, or the words version or release", () => {
+    const heading = h => check("feat", code + patch("CHANGELOG.md", `+${h}\n+- You can now export a report.\n`)).problems.some(p => /release heading/.test(p));
+    assert.equal(heading("### 2FA fixes"), false);
+    assert.equal(heading("### Added"), false);
+    for (const h of ["## 1.2.0", "## [1.2.0] - 2026-11-05", "## v2.0", "## 2026-11-05", "## Release candidate", "## Version 3"]) assert.equal(heading(h), true, h);
+  });
+  it("with the project key known, flags only that key, so product names like USB-3 pass", () => {
+    const line = l => code + patch("CHANGELOG.md", ` ## Unreleased\n+- ${l}\n`);
+    const keyed = (l, key) => cli.changelogCheck("feat", line(l), "CHANGELOG.md", { key }).problems.some(p => /ticket key/.test(p));
+    assert.equal(keyed("Charging over USB-3 works again.", "ACME"), false);
+    assert.equal(keyed("Faster exports (ACME-12).", "ACME"), true);
+    assert.equal(keyed("Faster exports (acme-12).", "ACME"), true);
+    assert.equal(keyed("Charging over USB-3 works again.", null), true, "without a key, any KEY-n still counts");
+  });
+  it("with the file on disk, reports an added entry outside ## Unreleased", () => {
+    const file = "# Changelog\n\n## Unreleased\n\n### Added\n- You can now export a report.\n\n## 1.0.0\n\n### Added\n- Reports open faster.\n";
+    const at = l => cli.changelogCheck("feat", code + patch("CHANGELOG.md", `+${l}\n`), "CHANGELOG.md", { fileText: file }).problems.some(p => /outside the Unreleased section/.test(p));
+    assert.equal(at("- You can now export a report."), false);
+    assert.equal(at("- Reports open faster."), true);
+    const noSection = cli.changelogCheck("feat", code + patch("CHANGELOG.md", "+- Reports open faster.\n"), "CHANGELOG.md", { fileText: "# Changelog\n\n- Reports open faster.\n" });
+    assert.ok(noSection.problems.some(p => /outside the Unreleased section/.test(p)), "no Unreleased section at all");
+    assert.equal(cli.changelogCheck("feat", code + patch("CHANGELOG.md", "+- Reports open faster.\n"), "CHANGELOG.md", {}).problems.length, 0, "no file text: no placement check");
+  });
+  it("places an added line by its hunk line number, so the same text under a release is caught", () => {
+    const file = "# Changelog\n\n## Unreleased\n\n- Fixed a crash.\n\n## 1.0.0\n\n- Fixed a crash.\n";
+    const hunk = (n, body) => `diff --git a/CHANGELOG.md b/CHANGELOG.md\n--- a/CHANGELOG.md\n+++ b/CHANGELOG.md\n@@ -${n},2 +${n},3 @@\n${body}`;
+    const outside = p => cli.changelogCheck("fix", code + p, "CHANGELOG.md", { fileText: file }).problems.some(x => /outside the Unreleased section/.test(x));
+    assert.equal(outside(hunk(7, " ## 1.0.0\n \n+- Fixed a crash.\n")), true, "line 9 is under 1.0.0");
+    assert.equal(outside(hunk(3, " ## Unreleased\n \n+- Fixed a crash.\n")), false, "line 5 is under Unreleased");
+  });
+  it("finds Unreleased at heading levels # to ###, ending at the next heading of its level", () => {
+    for (const h of ["#", "##", "###"]) {
+      const file = `# Changelog\n\n${h} Unreleased\n\n#### Added\n- Faster exports.\n\n${h} 1.0.0\n- Old.\n`;
+      const at = l => cli.changelogCheck("feat", code + patch("CHANGELOG.md", `+${l}\n`), "CHANGELOG.md", { fileText: file }).problems.some(p => /outside the Unreleased section/.test(p));
+      assert.equal(at("- Faster exports."), false, h);
+      assert.equal(at("- Old."), true, h);
+    }
+  });
   it("maps the commit type to a heading; only feat, fix and perf need an entry", () => {
     assert.deepEqual([check("feat", code).heading, check("fix", code).heading, check("perf", code).heading], ["Added", "Fixed", "Improved"]);
     for (const type of ["chore", "refactor", "test", "docs", "build", "ci", "style", "revert"]) {
@@ -459,6 +537,30 @@ describe("work on the base branch", () => {
       .join("\x1e\n");
     assert.deepEqual(cli.commitsForKey(l, "HSM-1").map(c => c.sha), ["1111111", "2222222", "3333333"]);
   });
+  it("flags revert commits, so a revert never counts as delivering the ticket", () => {
+    const l = [["5555555", "d", 'Revert "Revert "feat: balance card (HSM-1)""', ""], ["1111111", "d", 'Revert "feat: balance card (HSM-1)"', "This reverts commit abc."], ["2222222", "d", "revert: balance card (HSM-1)", ""], ["4444444", "d", "Reverts HSM-1 card", ""], ["3333333", "d", "fix: follow-up to HSM-1", ""]]
+      .map(r => r.join("\x1f"))
+      .join("\x1e\n");
+    assert.deepEqual(cli.commitsForKey(l, "HSM-1").map(c => [c.sha, !!c.revert]), [["5555555", false], ["1111111", true], ["2222222", true], ["4444444", true], ["3333333", false]], "a revert of a revert delivers again");
+  });
+  it("lets a revert newer than the ticket's commits cancel them, and a newer commit deliver again", () => {
+    const c = (sha, revert) => ({ sha, at: "t", ...(revert ? { revert } : {}) });
+    const undone = cli.baseStateFor("main", [c("bbbbbbb", true), c("aaaaaaa")], [c("bbbbbbb", true), c("aaaaaaa")]);
+    assert.equal(undone.state, "no-branch");
+    assert.equal(undone.base.reverted, "pushed");
+    assert.deepEqual(undone.base.pushed_commits, []);
+    const again = cli.baseStateFor("main", [c("ccccccc"), c("bbbbbbb", true), c("aaaaaaa")], []);
+    assert.equal(again.state, "base-pushed");
+    assert.deepEqual(again.base.pushed_commits, ["ccccccc"], "only the commits after the revert deliver");
+    assert.equal("reverted" in again.base, false);
+    const localRevert = cli.baseStateFor("main", [c("aaaaaaa")], [c("bbbbbbb", true), c("aaaaaaa")]);
+    assert.equal(localRevert.state, "base-pushed", "origin still delivers it");
+    assert.equal(localRevert.base.reverted, "local", "the revert is only local: sync reports it");
+    const redo = cli.baseStateFor("main", [c("bbbbbbb", true), c("aaaaaaa")], [c("ccccccc"), c("bbbbbbb", true), c("aaaaaaa")]);
+    assert.deepEqual([redo.state, redo.base.reverted], ["base-local", "pushed"], "reverted on origin, delivered again locally");
+    const behind = cli.baseStateFor("main", [c("ccccccc"), c("bbbbbbb", true), c("aaaaaaa")], [c("bbbbbbb", true), c("aaaaaaa")]);
+    assert.deepEqual([behind.state, "reverted" in behind.base], ["base-pushed", false], "a local base behind origin is no local revert");
+  });
   it("never returns message text as a sha, even when a message carries the separators", () => {
     const evil = `aaaaaaa\x1fd\x1ffeat (HSM-1)\x1fbody\x1e\nnot-a-sha; rm -rf /\x1fd\x1fHSM-1\x1f\x1e\n`;
     assert.deepEqual(cli.commitsForKey(evil, "HSM-1").map(c => c.sha), ["aaaaaaa"]);
@@ -483,6 +585,22 @@ describe("work on the base branch", () => {
     assert.equal(cli.baseStateFor("main", [], [c("e5f6a7b", "x")]).state, "base-local");
     assert.deepEqual(cli.baseStateFor("main", [], []).base, { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null, pushed_commits: [] });
     assert.equal(cli.baseStateFor("main", [], []).state, "no-branch");
+    const newer = cli.baseStateFor("main", [c("a1b2c3d", "2026-10-29T10:00:00+05:00")], [c("b9b9b9b", "2026-10-30T10:00:00+05:00"), c("a1b2c3d", "2026-10-29T10:00:00+05:00")]);
+    assert.equal(newer.state, "base-local", "a newer fix that is only local decides: it is not pushed yet");
+    const behind = cli.baseStateFor("main", [c("f00d123", "x"), c("a1b2c3d", "y")], [c("a1b2c3d", "y")]);
+    assert.equal(behind.state, "base-pushed", "a local branch that is only behind origin is still delivered");
+  });
+  it("lets a pushed base-branch commit win over an ai/* branch that has no PR", () => {
+    const review = { branch: "ai/HSM-1-x", pr: null, state: "review", ambiguous: false, local: true };
+    const pushed = cli.baseStateFor("main", [{ sha: "a1b2c3d", at: "t" }], []);
+    assert.deepEqual(cli.withBase(review, pushed), { ...pushed, stale_branch: "ai/HSM-1-x" }, "base-branch work: no branch to switch to");
+    assert.equal(cli.withBase(review, pushed).branch, null);
+    const local = cli.baseStateFor("main", [], [{ sha: "a1b2c3d", at: "t" }]);
+    assert.deepEqual(cli.withBase(review, local), review, "only a pushed commit counts");
+    const qa = { ...review, state: "qa", pr: { number: 4 } };
+    assert.deepEqual(cli.withBase(qa, pushed), qa, "an open PR is followed through its PR");
+    assert.deepEqual(cli.withBase({ ...review, ambiguous: true }, pushed), { ...review, ambiguous: true });
+    assert.deepEqual(cli.withBase(review, cli.baseStateFor(null, [], [])), review);
   });
   it("says when no base branch was searched", () => {
     assert.deepEqual(cli.baseStateFor(null, [], []), { branch: null, pr: null, state: "no-branch", ambiguous: false, base: null });
@@ -550,6 +668,21 @@ describe("CLI", () => {
     const out = JSON.parse(r.stdout);
     assert.equal(out.origin, "github.com/org/app");
     assert.deepEqual(out.matches, ["https://github.com/org/app/tree/dev"]);
+  });
+  it("repo-match reads the tags on stdin and probes the repo's top folder and origin names", () => {
+    const parent = mkdtempSync(join(tmpdir(), "hashsmith-rm-"));
+    const dir = fixtureRepo('[remote "origin"]\n\turl = git@github.com:Org/acme-web.git\n', join(parent, "web"));
+    mkdirSync(join(dir, "sub"));
+    const task = { result: { code: "ACME-1", tags: ["ui", "repo:acme-web", "repo:$(touch pwned)"] } };
+    const r = spawnSync(process.execPath, [CLI, "repo-match"], { cwd: join(dir, "sub"), encoding: "utf8", input: JSON.stringify(task) });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { probes: ["web", "acmeweb"], repos: ["acme-web", "$(touch pwned)"], match: true, others: ["$(touch pwned)"] });
+    assert.equal(existsSync(join(dir, "sub", "pwned")), false);
+    for (const bad of ["not json", '{"result": {}}']) {
+      const r2 = spawnSync(process.execPath, [CLI, "repo-match"], { cwd: dir, encoding: "utf8", input: bad });
+      assert.equal(r2.status, 2, bad);
+      assert.match(JSON.parse(r2.stdout).error, /ticket's tags/);
+    }
   });
   it("project-candidates reads the projects on stdin and probes the folder and origin names", () => {
     const parent = mkdtempSync(join(tmpdir(), "hashsmith-cand-"));
@@ -631,6 +764,15 @@ describe("CLI", () => {
       assert.equal(r.status, 2, bad);
       assert.ok(JSON.parse(r.stdout).error, bad);
     }
+  });
+  it("every command runs from the repo's top level, so a subfolder reads the root's hashsmith.json", () => {
+    const dir = fixtureRepo();
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ repo: { base_branch: "main" } }));
+    mkdirSync(join(dir, "sub"));
+    const state = spawnSync(process.execPath, [CLI, "ticket-state", "ACME-1"], { cwd: join(dir, "sub"), encoding: "utf8" });
+    assert.equal(JSON.parse(state.stdout)["ACME-1"].base.branch, "main", state.stdout + state.stderr);
+    const conf = spawnSync(process.execPath, [CLI, "check-config"], { cwd: join(dir, "sub"), encoding: "utf8" });
+    assert.doesNotMatch(conf.stdout, /not found/, conf.stdout);
   });
   it("an unknown command exits 2 with usage", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });

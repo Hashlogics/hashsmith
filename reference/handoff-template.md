@@ -72,3 +72,14 @@ Hashsmith created no branch and ran no git write; the developer asked for this o
 change is unstaged: review it, then commit with the commit message above (keep ACME-12 in it)
 and push. /hashsmith:next then moves this ticket to QA.
 ```
+
+On another branch (neither the base nor the ticket's `ai/*` branch; `<policy>` is the
+`repo.branch_policy` in force):
+
+```
+Git
+Hashsmith created no branch and ran no git write (branch policy: <policy>); the change is on
+<branch>, unstaged. Review it, commit with the commit message above (keep ACME-12 in it, and in
+the PR title if the branch is squash-merged) and push. /hashsmith:next moves this ticket to QA
+once that commit is on origin/<base>.
+```

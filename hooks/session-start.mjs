@@ -2,7 +2,7 @@
 // SessionStart: load the conduct rules, check the session's scope, and show what is new since the
 // last version this person saw (design §2, §9, §10). Everything here is context for the model; the
 // one systemMessage line is for the developer.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,17 +24,35 @@ export function whatsNew(changelog, since) {
   return sections.filter(s => newer(s.match(/^## (\d+\.\d+\.\d+)/)[1], since)).join("").trim();
 }
 
+/** The child folders of `dir` that are Git repositories (a `.git` folder or file, so worktrees and
+ *  submodules count), sorted; hidden folders are skipped. At most 20 names. */
+export function childRepos(dir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter(e => !e.name.startsWith(".") && (e.isDirectory() || e.isSymbolicLink()) && existsSync(join(dir, e.name, ".git")))
+      .map(e => e.name)
+      .sort()
+      .slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
 export function evaluate(event, { seenFile = SEEN } = {}) {
   const version = JSON.parse(read(".claude-plugin/plugin.json")).version;
   const dir = projectDir(event);
   const root = repoRoot(dir);
 
   if (!root) {
+    const repos = childRepos(dir);
+    const workspace = repos.length
+      ? ` Git repositories here: ${repos.join(", ")}. /hashsmith:onboard-project may run here only to list them and explain the per-repository workflow (README "One product, several repositories"): it writes nothing and calls no HashOps tool.`
+      : "";
     return {
       systemMessage: `Hashsmith ${version} is inactive: this folder is not a git repository.`,
       hookSpecificOutput: {
         hookEventName: "SessionStart",
-        additionalContext: `Hashsmith is INACTIVE in this session: ${dir} is not inside a single git repository (it may be a folder holding several projects). Do not run any /hashsmith:* skill or use the hashops MCP tools for Hashsmith work here. If the developer asks for Hashsmith, tell them to start Claude Code inside the project's own folder.`,
+        additionalContext: `Hashsmith is INACTIVE in this session: ${dir} is not inside a single git repository (it may be a folder holding several projects). Do not run any other /hashsmith:* skill or use the hashops MCP tools for Hashsmith work here. If the developer asks for Hashsmith, tell them to start Claude Code inside the project's own folder.${workspace}`,
       },
     };
   }
@@ -44,10 +62,10 @@ export function evaluate(event, { seenFile = SEEN } = {}) {
   const key = config?.hashops?.project_key;
   parts.push(
     config?.hashops?.project_id
-      ? `This project is onboarded: hashsmith.json at ${root} (HashOps project ${key ?? config.hashops.project_id}). Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*, never another connection to the same server (for example one named "peoplemuster").`
+      ? `This project is onboarded: hashsmith.json at ${root} (HashOps project ${key ?? config.hashops.project_id}). For Hashsmith's work use only the HashOps tools named mcp__plugin_hashsmith_hashops__*, never another connection to the same server (for example one named "peoplemuster"). The developer's own HashOps tasks (Daily Recaps, to-dos, leave) are not Hashsmith's work: its connection denies them, and the developer does them in the HashOps app or through their own connection, which asks before each write.`
       : `This project is not onboarded yet (no HashOps project in ${join(root, "hashsmith.json")}). When the developer wants Hashsmith work, propose /hashsmith:onboard-project first (/hashsmith:feedback works without it). Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
   );
-  parts.push(`Hashsmith CLI: node "${CLI}" <command> (repo-slug, project-candidates, lists-before-todo, env-keys, git-switch, check-config, tree, ticket-state, feedback-target, changelog, changelog-check). Run it from the repo root; it prints one JSON line.`);
+  parts.push(`Hashsmith CLI: node "${CLI}" <command> (repo-slug, project-candidates, lists-before-todo, repo-match, env-keys, git-switch, check-config, tree, ticket-state, feedback-target, changelog, changelog-check). Run it from the repo root; it prints one JSON line.`);
 
   let seen = null;
   try {

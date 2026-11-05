@@ -4,6 +4,18 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.7.0 — 2026-11-05
+
+- Logging time, a to-do or leave from a Hashsmith session: Hashsmith's own HashOps connection
+  still refuses them, and now says to use the HashOps app or your own HashOps connection instead.
+- Sharper board tracking: a revert no longer counts as delivering a ticket, an unpushed fix keeps
+  its ticket out of QA, `/hashsmith:next` reads only this board's lists, and the changelog check
+  stops flagging headings like "2FA fixes" or product names like USB-3.
+- Teams that never want Hashsmith to switch branches can say so once: onboarding asks for a branch
+  policy (`managed`, `current` or `confirm`), and `work` and `qa` follow it.
+- One product in several repositories: onboard each repository onto the same board and tag
+  tickets `repo:<name>`; `work` flags a ticket meant for another repository (README).
+
 ## 0.6.2 — 2026-11-05
 
 - `/hashsmith:qa` works for projects with no web UI (CLIs, libraries, plugins): it runs the

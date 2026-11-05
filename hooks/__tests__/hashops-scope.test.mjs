@@ -40,6 +40,19 @@ describe("hashops-scope", () => {
     assert.equal(decision("get_task", { task_code: "HSM-4" }), null);
   });
 
+  it("on the feedback board, lets only filing a report through: every other write asks", () => {
+    assert.equal(decision("update_task", { task_code: "HSM-4", title: "x" }), "ask");
+    assert.equal(decision("move_task", { task_code: "HSM-4", list_id: "x" }), "ask");
+    assert.equal(decision("comment_on_task", { task_code: "HSM-4", content: "x" }), "ask");
+    assert.equal(decision("create_board_list", { board_id: FB_B, name: "x" }), "ask");
+    assert.equal(decision("create_project_tag", { project_id: FB_P, name: "x" }), "ask");
+    assert.match(call("move_task", { task_code: "HSM-4", list_id: "x" }).hookSpecificOutput.permissionDecisionReason, /feedback board/);
+    // The Hashsmith repo itself is onboarded onto that board: there it is the project's own, and nothing asks.
+    const own = { hashops: { project_id: FB_P, board_id: FB_B, project_key: "HSM" } };
+    assert.equal(decision("move_task", { task_code: "HSM-4", list_id: "x" }, own), null);
+    assert.equal(decision("comment_on_task", { task_code: "HSM-4", content: "x" }, own), null);
+  });
+
   it("before onboarding, lets reads through and asks on writes", () => {
     assert.equal(decision("list_my_projects", {}, null), null);
     assert.equal(decision("get_board", { board_id: OTHER }, null), null);
@@ -56,11 +69,21 @@ describe("hashops-scope", () => {
     assert.match(call("create_employee_event", {}).hookSpecificOutput.permissionDecisionReason, /only allows the tools its skills use/);
   });
 
+  it("denies time logging and to-dos, and says where the developer's own HashOps tasks go", () => {
+    for (const tool of ["log_daily_recap", "get_daily_recaps", "submit_daily_recap", "create_todo"]) {
+      assert.equal(decision(tool, {}), "deny", tool);
+      const reason = call(tool, {}).hookSpecificOutput.permissionDecisionReason;
+      assert.match(reason, /Daily Recaps, to-dos/, tool);
+      assert.match(reason, /HashOps app or their own HashOps connection/, tool);
+    }
+  });
+
   it("in an onboarded repo, asks before a HashOps write through another connection", () => {
     const other = (tool, cfg = config) =>
       evaluate({ tool_name: `mcp__peoplemuster__${tool}`, tool_input: {} }, cfg, feedback)?.hookSpecificOutput.permissionDecision ?? null;
     assert.equal(other("approve_leave_request"), "ask");
     assert.equal(other("create_task"), "ask");
+    for (const tool of ["log_daily_recap", "submit_daily_recap", "create_todo"]) assert.equal(other(tool), "ask", tool); // the deny message promises this
     assert.equal(other("list_tasks"), null); // reads pass
     assert.equal(other("approve_leave_request", null), null); // not onboarded: not Hashsmith's business
     assert.equal(evaluate({ tool_name: "mcp__github__create_issue", tool_input: {} }, config, feedback), null);

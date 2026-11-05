@@ -107,7 +107,7 @@ describe("skills and agents", () => {
   });
   it("Hashsmith never touches a project's versions or releases", () => {
     const text = readFileSync(join(root, "reference", "changelog.md"), "utf8");
-    assert.match(text, /\*\*Never\*\* edit a version field, add or rename a version heading, rename `Unreleased`/);
+    assert.match(text, /\*\*Never\*\* edit a version field, add or rename a version heading, rename `Unreleased`, or touch\s+the project's release tooling/);
   });
   it("the ticket assessment defines every check and level work's brief uses", () => {
     const text = readFileSync(join(root, "reference", "ticket-assessment.md"), "utf8");

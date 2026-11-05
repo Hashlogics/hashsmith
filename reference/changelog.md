@@ -68,8 +68,10 @@ Not: "Added `LeaveBalanceCard` to Dashboard.tsx (ACME-12)", "Fixed race in useTi
 
 `changelog-check <type>` with the patch on stdin (`< "$P"`) prints `needs_entry`, `heading`,
 `missing_entry` (a feat, fix or perf that adds no line to the changelog) and `problems`: ticket
-keys, file names or code spans in added lines, an added release heading (a version, a date), a
-removed section heading or link reference, a changed `version` in the root `package.json`. Other
+keys (only the project's own key when `hashsmith.json` names it), file names or code spans in
+added lines, an added release heading (a version, a date, "version" or "release"), an added line
+outside Unreleased (by its line in the file on disk), a removed section heading or link reference,
+a changed `version` in the root `package.json`. Other
 release tooling (workflows, release configs) is the diff reviewer's to catch. Fix every problem;
 write a missing entry unless the line is already under Unreleased. In `commits` or `off` mode it
 prints `needs_entry: false`. It reads the whole patch: on the base

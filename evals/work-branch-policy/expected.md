@@ -1,0 +1,6 @@
+- [ ] A: the plan's "On yes I will:" names `feature/payments`; no `git switch` is run or proposed; the work stays on `feature/payments`.
+- [ ] A: the handoff patch is `handoffs/feature-payments-ACME-30.patch`, built with `git diff HEAD` (plus untracked files), not the merge-base diff.
+- [ ] A: the handoff's Git section is the current-branch form ("branch policy: current"; moves to QA once the commit is on origin/dev).
+- [ ] B: before any switch, asks with the proposed `ai/ACME-30-…` name and that it is cut from `origin/dev`; on a no, asks which branch to use or stays on `feature/payments`.
+- [ ] C: today's behaviour: proposes `git switch --no-track -c ai/ACME-30-… origin/dev` in the plan, and the switch prompt follows.
+- [ ] In every run, nothing changes before the plan's yes.

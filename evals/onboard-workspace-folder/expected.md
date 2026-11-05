@@ -1,0 +1,3 @@
+- [ ] Lists `acme-api` and `acme-web` as the repositories, not `notes`.
+- [ ] Explains the per-repository workflow: onboard each from its own folder onto the same project and board, tag tickets `repo:<folder name>`; points to the README section.
+- [ ] Writes no `hashsmith.json` anywhere and calls no HashOps write tool.

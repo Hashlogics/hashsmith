@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.6.2** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.7.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -66,8 +66,9 @@ review every change and do the commit, the push and the PR yourself.
    Authenticate, then Approve on the HashOps page. You act as yourself, with your own HashOps
    access. You need this even if you already connected HashOps another way (for example
    `peoplemuster` from the in-app Connect dialog): Hashsmith has its own connection, so that its
-   project guard applies. Keep the other one for your own use.
-4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.6.1`.
+   project guard applies. Keep the other one for your own HashOps tasks (Daily Recaps, to-dos,
+   leave): Hashsmith's connection denies them.
+4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.7.0`.
 
 Optional tools you install yourself (Hashsmith does not declare them, so you never run two
 copies): a SonarQube MCP server (issues on changed files during self-review) and the official
@@ -94,6 +95,23 @@ says so.
 If the project's `.claude/settings.json` denies `git switch`, move `Bash(git switch *)` from deny to
 ask (keep `git checkout *` denied), so Hashsmith can create its `ai/*` branches. Onboarding tells
 you when that is needed.
+
+### One product, several repositories
+
+When one product (one HashOps project and board) has its code in several repositories, for
+example a backend, a frontend and a mobile app under one folder, Hashsmith works one repository
+per session:
+1. Onboard each repository from its own folder, choosing the same project and board each time.
+   Each gets its own `hashsmith.json`, with its own base branch, branch policy and QA settings.
+2. Tag each ticket with the repository it belongs to: `repo:<folder name>` (create the tags once
+   in HashOps). A ticket that needs several gets one tag per repository.
+3. Run `/hashsmith:work` from the repository's own session. A ticket tagged only for another
+   repository gets a concern naming it; one tagged for several is planned for this repository's
+   part only, and each part gets its own branch, handoff and PR from its own session.
+
+Starting Claude Code in the parent folder keeps Hashsmith inactive, and onboarding there lists
+the repositories and points here. A single workspace session is planned
+(`docs/plans/2026-11-05-workspace-repositories.md`).
 
 ## Use it every day
 
@@ -153,6 +171,7 @@ Your next session starts with a short "what's new".
 | A readiness check is **blocked** | It could not run; the report says what to start (for example the local stack) |
 | A `git switch` is denied | The project denies it: see "Set up a project" |
 | HashOps says a write tool doesn't exist, or writes stop working | Your Connected apps level for this connection is Read only: in HashOps, open your profile → Connected apps and set Claude Code to **Work** |
+| A HashOps call is denied: "only allows the tools its skills use" (for example logging time or a to-do) | Hashsmith's connection is for ticket work only. Log your Daily Recap or to-do in the HashOps app, or through your own HashOps connection (for example `peoplemuster`), which asks before each write in an onboarded project |
 | A HashOps call asks "reaches outside this project" | Say no unless you meant it. If `hashsmith.json` is stale, run `/hashsmith:onboard-project` |
 | Design or QA says the browser is missing | `npx playwright install chromium`, then restart Claude Code |
 

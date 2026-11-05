@@ -28,19 +28,21 @@ before To Do and are not in `hashops.lists`. An `error` that To Do is not on thi
 stale ids: say so and propose `/hashsmith:onboard-project`; any other `error` means the input was
 wrong: run it again with `get_board`'s `lists`.
 
-`list_tasks` with `limit: 60` for those lists and for To Do, In Progress, Review and QA (list
-names from `get_board` for the ids in `hashops.lists`). It returns no tags and sorts by last
-update, not priority. Count the tickets per list (sync already told you which in flight are
-Hashsmith's). When To Do is empty, note the top three tickets across the lists before To Do by
-priority, each with its list's name. In To Do note:
+`list_tasks` with `{board_id, status: <list name>, limit: 60}` for those lists and for To Do, In
+Progress, Review and QA (list names from `get_board` for the ids in `hashops.lists`; without
+`board_id` a name matches lists on every project). It returns no tags and sorts by last update,
+not priority. Count the tickets per list (sync already told you which in flight are Hashsmith's),
+and say when any list was cut at 60. When To Do is empty, note the top three tickets across the
+lists before To Do by priority, each with its list's name. In To Do note:
 - **QA bounces:** run the CLI's `ticket-state` for the To Do keys. A To Do ticket that has an
   `ai/*` branch was handed off before; `get_task` it, and it is a bounce when its last comment
   starts "QA failed (Hashsmith)";
 - the top three other To Do tickets by priority, sorted yourself (any tag: humans' tickets can be
-  picked up too). Say when a list was cut at 60.
+  picked up too).
 
 Also note the working tree (CLI `tree`): uncommitted changes mean a handoff is waiting for the
-developer, and Hashsmith cannot switch branches until it is committed.
+developer, and Hashsmith cannot switch branches until it is committed. Under
+`repo.branch_policy` `current`, `work` never switches and runs on a dirty tree.
 
 ## 4. Propose
 
@@ -48,7 +50,7 @@ Show a short status, the lists before To Do first under their own names (`Backlo
 (1 QA bounce) · In Progress 0 · Review 2 · QA 1`), then offer the choices that apply, in this
 order; the first one that applies is the recommendation. **When the tree is not clean, choice 3
 comes first**, and choices 1, 2 and 4 are shown as "needs a clean tree": `work` and `qa` both
-stop on uncommitted changes.
+stop on uncommitted changes. Under `current`, choices 1 and 4 need no clean tree.
 
 1. **Fix a QA bounce:** `/hashsmith:work <KEY>`. A failed QA blocks the release of that work.
 2. **QA what's waiting:** `/hashsmith:qa` for tickets in QA (an open PR, or a pushed commit on
@@ -58,8 +60,9 @@ stop on uncommitted changes.
    review, commit, push and open a PR; nothing for Hashsmith to do until then.
 4. **Work the next ticket:** `/hashsmith:work <KEY>` for the top To Do ticket, naming the next two
    as alternatives. When To Do is empty, the top ticket from the lists before To Do instead,
-   naming its list and the next two: choosing it is the yes to `move_task` it to `lists.todo`
-   (say so in one line), then run `work`. Only on a clean tree: otherwise nothing moves.
+   naming its list and the next two: choosing any of them is the yes to `move_task` that ticket
+   to `lists.todo` (say so in one line), then run `work`. Only on a clean tree: otherwise nothing
+   moves.
 5. **New requirements:** `/hashsmith:intake`, when the developer has notes, a doc, a Slack thread
    or a meeting to turn into tickets.
 

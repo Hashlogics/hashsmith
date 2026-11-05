@@ -203,7 +203,7 @@ state from git and GitHub:
 
 **Work on the base branch (decided 2026-10-29, HSM-4).** A developer may ask for a ticket to be
 done on the base branch itself, with no `ai/*` branch. Its handoff then asks for the ticket key in
-the commit message, and `ticket-state` searches the last 200 commits of `<base>` and
+the commit message, and `ticket-state` searches the commits of `<base>` and
 `origin/<base>` for it (an exact key match: KEY-1 never matches KEY-12). The key, not the handoff
 patch, is the link: matching changed files would also catch unrelated commits. A failed
 `git fetch` is reported at the top of the sync summary: `origin` can only lag, so a pushed commit
@@ -213,6 +213,20 @@ only when the tree is on the base branch and shares a path with that ticket's sa
 them); a dirty tree is never pinned on every ticket. A `base-pushed` commit older than the
 ticket's last QA failure is not proposed again. `qa` runs base-branch work on the base
 branch itself, after checking the commit is in `HEAD` and `HEAD` matches `origin/<base>`.
+
+**Edge cases (decided 2026-11-05, HSM-15).** `ticket-state` finds a key's base-branch commits with
+`git log --grep` (no cap on how far back) and matches the key exactly. Any commit that mentions
+the key counts as delivery ("follow-up to ACME-22" too), except a revert (a subject starting
+"Revert" or "Reverts"), which undoes it: a revert newer than the ticket's other commits cancels
+them (`no-branch`, `base.reverted: "pushed"`), and a commit after the revert delivers again. A
+revert only on the local base leaves origin delivering it (`base-pushed`, `reverted: "local"`).
+A revert of a revert (older git's name for a reapply) delivers again. `ACME-1a` still counts for
+ACME-1: only a longer number is another ticket. The newest commit decides: a local fix newer than
+every pushed commit gives `base-local` until it is pushed. An `ai/*` branch with no PR no longer
+hides a pushed base-branch commit: the state is then plain base-branch work (`branch: null`) and
+the leftover branch is `stale_branch`; an open or merged PR is still followed through the PR. Every CLI command
+runs at the repo's top level, from any subfolder. Patch names replace `/` in the base branch's
+name, as they do in branch names.
 
 `/hashsmith:sync KEY-12 reviewed` is the manual fallback when git cannot tell. `work`, `qa` and
 `intake` run `sync` first, so the board is current whenever Hashsmith starts something.
@@ -242,7 +256,7 @@ secret.
     "lists": { "todo": "…", "in_progress": "…", "review": "…", "qa": "…", "done": "…" },
     "ai_tag": "hashsmith"
   },
-  "repo": { "base_branch": "dev" },      // what ai/* branches are cut from and PRs target
+  "repo": { "base_branch": "dev", "branch_policy": "managed" },  // base: what ai/* branches are cut from and PRs target; policy: managed | current | confirm
   "qa": { "base_url": "http://localhost:8080", "mode": "browser" },  // mode: browser | code | "" (ask)
   "sonar": { "project_key": "hashlogics_hashops" },
   "sentry": { "project": "…" },
@@ -346,6 +360,16 @@ Hashsmith up for a project.
    no is `off`, never asked again. End users rarely know what changed, so the default is to keep
    one. Hashsmith never edits versions or release headings, and creates the file only with its
    first entry. Projects onboarded earlier get the same lookup the first time `work` needs it.
+   Decided 2026-11-05 (HSM-15): release-it alone is not a generator (it writes no changelog; its
+   changelog plugins are detected as conventional-changelog, or keep a file, which is `write`);
+   a `package.json` key counts only as a config object; conventional-changelog matches the tool's
+   own package names, not presets named after it. A stored `commits` mode stands, like `off`,
+   because some generators cannot be detected; onboarding changes it. `changelog-check` flags only
+   the project's own ticket key when it is known (so product names like USB-3 pass), treats a
+   heading as a release heading only for a version, a date or the words version or release (a
+   heading like "OAuth 2.0 sign-in" is then flagged too; accepted, since Hashsmith adds entries,
+   not headings), and reports an entry added outside Unreleased (`#` to `###`) by its line in the
+   file on disk.
 7. **Local readiness report.** One table of checks, each reported as pass, fail or blocked:
    - project `CLAUDE.md` exists;
    - a `ship-check` skill or a test chain exists;
@@ -414,7 +438,19 @@ message), with or without their own instructions, and wants tickets.
    the session is not on the ticket's branch, it offers to switch to it.
 3. **Branch.** Check the working tree is clean (§4). Run `git fetch origin` and then
    `git switch -c ai/KEY-12-slug origin/<base_branch>`. The developer approves the `switch`
-   prompt.
+   prompt. **Branch policy (decided 2026-11-05, HSM-12):** branch habits are a team convention,
+   so `repo.branch_policy` records one, asked once at onboarding. `managed` (the default; empty
+   or missing means managed, so older configs keep today's behaviour) is the rule above.
+   `current` never switches: the work goes on the checked-out branch, the handoff patch is
+   `git diff HEAD` on a branch other than the base (also under `confirm` after a no), and sync
+   follows the ticket through its key once the commit is on `origin/<base_branch>`; until then it
+   reports "waiting to reach origin/<base>", and a squash merge must keep the key in the PR title.
+   A resume stays on that branch, and `next` drops its clean-tree gate for `work`. Paths already
+   dirty before the work are listed in the handoff as not the ticket's. `confirm` asks before
+   each switch. Whatever the
+   policy, the plan names the branch before anything changes; `qa` never switches under
+   `current` and asks first under `confirm`. In a workspace of several repositories each has its
+   own policy (HSM-11).
 4. Move the ticket to In Progress. Add the `ai_tag` tag: `update_task` **replaces** all tags, so read
    the current tags first and add to them. Comment the plan.
 5. Implement it, following the project's `CLAUDE.md`, skills and patterns. Use Appendix A only
@@ -657,16 +693,37 @@ server-side layer exists too: each HashOps connection has an access level (read 
 full, default work) on the profile's Connected apps card, enforced by the MCP server for every
 client. Hashsmith needs **Work**: every tool it uses is a Work tool.
 
+**The developer's own HashOps tasks stay outside (decided 2026-11-05, HSM-17).** A developer asked
+a Hashsmith session to log their Daily Recap; the guard denied `log_daily_recap`, and nothing said
+where to go instead. Time logs, to-dos and leave are the developer's own records, and a submitted
+Daily Recap is reviewed and approved by others: they are not part of a developer workflow, so they
+stay off the allowlist. Instead the deny message and the session-start line send them to the
+HashOps app or the developer's own HashOps connection, whose writes the scope hook asks about in
+an onboarded repo. "Never another connection" applies to Hashsmith's own work only.
+
 **Three things are not per-project, and are guarded:**
 1. **The HashOps MCP sees every project the person can see.** `hashops-scope.mjs` reads the tool
    input:
    - a `project_id` or `board_id` that differs from `hashsmith.json`, or a `task_code` whose
      prefix is not `project_key`, turns the call into an **ask** that names the mismatch;
-   - the one allowed exception is the Hashsmith feedback board (§12);
+   - the one allowed exception is the Hashsmith feedback board (§12), and only for reads and
+     `create_task`: any other write there asks, unless that board is the session's own project
+     (the Hashsmith repo itself). A call that names only a `task_id` carries no project, so RLS
+     decides it; Hashsmith's skills always pass `task_code` (decided 2026-11-05, HSM-15);
    - before onboarding, when there is no config, reads are allowed and writes are asks.
 2. **A session spanning several repos.** `session-start.mjs` tells the model that Hashsmith is
    inactive when the session root is not a single git repo, for example `~/Sites/hashlogics`.
-   Conduct rule 9 covers `--add-dir`.
+   Conduct rule 9 covers `--add-dir`. **One product in several repositories (decided 2026-11-05,
+   HSM-11):** each repository is onboarded on its own, all onto the same project and board, and
+   tickets carry a `repo:<name>` tag. The CLI's `repo-match` compares those tags with the
+   repository's folder and origin names; the ticket assessment raises a Concern for a ticket
+   tagged only for another repository, and a ticket tagged for several is planned for this
+   repository's part only. In a parent folder, session-start lists the child repositories (a
+   `.git` folder or file, hidden folders skipped) and lets onboarding only explain this, writing
+   nothing. A single workspace session (one `hashsmith.json` with a
+   `repositories` map, a repository path for the CLI and the guard hooks) changes how every guard
+   finds its config, so it is planned separately in `docs/plans/2026-11-05-workspace-repositories.md`
+   rather than built here.
 3. **Lessons flowing into the shared plugin.** Feedback reports (§12) are written in general
    terms: no client names, project names, code, ids or data. The developer sees the full text
    before it is filed, and the maintainer reviews it again before anything ships.

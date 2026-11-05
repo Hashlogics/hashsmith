@@ -100,7 +100,6 @@ Keep this list current: add what you defer, remove what you finish.
   - intake sends `list_id: ""` when `lists.todo` is empty; it should look the id up;
   - `checkConfig` rejects empty `project_id` / `board_id`, though design §5 says empty means
     "look it up";
-  - the CLI assumes it runs at the repo root; it should `chdir` to `git rev-parse --show-toplevel`;
   - `env-keys` ignores `.env.development(.local)`, so it reports false "missing" keys;
   - readiness table gaps: the mail-catcher row lacks the "only with `supabase/config.toml`"
     condition; the test-users row can't actually be checked; `git-switch` results `none`/`allow`
@@ -136,5 +135,9 @@ Keep this list current: add what you defer, remove what you finish.
   its top under `## Unreleased`; after the hashops pilot, decide whether to switch to one file
   per change. Onboarding hashops will ask the changelog question (its `version-bump.yml` only
   bumps `package.json`); stamping `Unreleased` at release would be a hashops workflow change.
+- [ ] **Workspace mode (HSM-11):** one session over several repositories of one product.
+  0.7.0 ships the per-repository workflow and `repo:` tags; the full design and its follow-up
+  tickets are in `docs/plans/2026-11-05-workspace-repositories.md`, waiting for approval. Run the
+  `work-repo-routing` and `onboard-workspace-folder` evals live.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

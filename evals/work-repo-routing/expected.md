@@ -1,0 +1,4 @@
+- [ ] Each brief's assessment runs the CLI's `repo-match` with the ticket's tags on stdin (a quoted heredoc), never on the command line.
+- [ ] ACME-40: the assessment is a Concern, "tagged for acme-api; run it from that repository's session"; nothing is planned before the developer decides.
+- [ ] ACME-41: the plan covers the acme-web part only and lists the acme-api part as done from its own session.
+- [ ] ACME-42: the assessment does not mention a repository; planning goes on as usual.

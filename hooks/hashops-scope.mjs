@@ -5,8 +5,10 @@
 //    developer is often an admin, and the MCP offers every tool their permissions allow.
 // 2. The MCP sees every project the developer can see, so a project_id, board_id or task_code that
 //    is not the one in hashsmith.json turns the call into an ask that names the mismatch. The
-//    Hashsmith feedback board (feedback-board.json) is the one allowed exception. Before
-//    onboarding, reads pass and writes ask.
+//    Hashsmith feedback board (feedback-board.json) is the one exception, for reads and filing a
+//    report (create_task) only; other writes there ask unless it is the session's own project.
+//    A call naming only a task_id carries no project: RLS decides it. Before onboarding, reads
+//    pass and writes ask.
 // 3. In an onboarded repo, a HashOps write through another connection to the same server (for
 //    example the developer's own "peoplemuster") asks: Hashsmith's guards do not cover it.
 // A call that passes gets no opinion: RLS and the normal permission flow decide.
@@ -39,7 +41,7 @@ export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) 
   }
   const tool = name.slice(PREFIX.length);
   if (!TOOLS.hashsmith.includes(tool))
-    return decide("deny", `Hashsmith's HashOps connection only allows the tools its skills use (hooks/hashops-tools.json); \`${tool}\` is not one of them. If the developer wants this done, they can do it in HashOps or through their own connection.`);
+    return decide("deny", `Hashsmith's HashOps connection only allows the tools its skills use (hooks/hashops-tools.json); \`${tool}\` is not one of them. It is for Hashsmith's developer workflow only. The developer's own HashOps tasks (Daily Recaps, to-dos, leave) go through the HashOps app or their own HashOps connection, which asks before each write in an onboarded repo.`);
 
   if (!h.project_id) {
     if (isRead(tool)) return null;
@@ -57,6 +59,14 @@ export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) 
   const fbKey = String(feedback.project_key ?? "").toUpperCase();
   if (key && ownKey && key !== ownKey && key !== fbKey)
     mismatches.push(`task ${String(input.task_code).trim()} is not on this project (${ownKey}-…)`);
+  // The feedback board's exception is for filing a report: create_task and reads. Any other write
+  // there (moving, editing or commenting on someone's report) asks, unless it is this project's own.
+  const onFeedback =
+    (!!feedback.project_id && input.project_id === feedback.project_id && input.project_id !== h.project_id) ||
+    (!!feedback.board_id && input.board_id === feedback.board_id && input.board_id !== h.board_id) ||
+    (!!key && !!fbKey && key === fbKey && key !== ownKey);
+  if (onFeedback && !isRead(tool) && tool !== "create_task")
+    mismatches.push("it is a write on the Hashsmith feedback board, where only filing a report (create_task) goes through");
 
   if (!mismatches.length) return null;
   return decide("ask", `\`${tool}\` reaches outside this project: ${mismatches.join("; ")}. Hashsmith works on one project per session. Confirm only if this is deliberate (for example, the board in hashsmith.json is stale).`);

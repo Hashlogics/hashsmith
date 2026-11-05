@@ -25,6 +25,21 @@ describe("session-start", () => {
     assert.doesNotMatch(out.hookSpecificOutput.additionalContext, /Hashsmith conduct/);
   });
 
+  it("in a folder holding repositories, lists them and allows onboarding only to explain the workflow", () => {
+    const dir = tmp();
+    for (const d of ["acme-web", "acme-api", ".hidden", "notes"]) mkdirSync(join(dir, d));
+    mkdirSync(join(dir, "acme-web", ".git"));
+    writeFileSync(join(dir, "acme-api", ".git"), "gitdir: ../.git/worktrees/acme-api\n"); // a worktree: .git is a file
+    mkdirSync(join(dir, ".hidden", ".git"));
+    const ctx = start(dir).hookSpecificOutput.additionalContext;
+    assert.match(ctx, /INACTIVE/);
+    assert.match(ctx, /Git repositories here: acme-api, acme-web\./);
+    assert.match(ctx, /\/hashsmith:onboard-project may run here only to list them and explain/);
+    assert.match(ctx, /writes nothing and calls no HashOps tool/);
+    assert.doesNotMatch(ctx, /notes|\.hidden/);
+    assert.doesNotMatch(start(tmp()).hookSpecificOutput.additionalContext, /may run here/, "no repositories: nothing runs");
+  });
+
   it("loads the conduct rules and proposes onboarding when there is no config", () => {
     const ctx = start(repo()).hookSpecificOutput.additionalContext;
     assert.match(ctx, /# Hashsmith conduct/);
@@ -38,6 +53,11 @@ describe("session-start", () => {
     const out = start(join(dir, "src"));
     assert.match(out.hookSpecificOutput.additionalContext, /onboarded: hashsmith.json .*HOPS/);
     assert.equal(out.systemMessage, `Hashsmith ${version} · HOPS`);
+  });
+  it("keeps Hashsmith's work on its own connection and sends the developer's own HashOps tasks elsewhere", () => {
+    const ctx = start(repo({ hashops: { project_id: "p1", project_key: "HOPS" } })).hookSpecificOutput.additionalContext;
+    assert.match(ctx, /For Hashsmith's work use only the HashOps tools named mcp__plugin_hashsmith_hashops__\*, never another connection/);
+    assert.match(ctx, /developer's own HashOps tasks \(Daily Recaps, to-dos, leave\)/);
   });
 
   it("gives skills the CLI's absolute path when active, never when inactive", () => {

@@ -11,14 +11,18 @@ look things up before asking, ask in one batch with a recommendation, and write 
 developer says yes.
 
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools (`list_my_projects` below
-means `mcp__plugin_hashsmith_hashops__list_my_projects`). Never use another connection to the same
-server. "The CLI" is the `Hashsmith CLI` line in your session context; run it from the repo root.
+means `mcp__plugin_hashsmith_hashops__list_my_projects`). For Hashsmith's work, never use another
+connection to the same server. "The CLI" is the `Hashsmith CLI` line in your session context; run it from the repo root.
 
 ## 1. Scope
 
 Run `git rev-parse --show-toplevel`. It must equal the session's working directory. If not, stop:
 Hashsmith works in one repo per session (conduct 9); tell the developer to start Claude Code in the
-repo's own folder.
+repo's own folder. When the session context lists "Git repositories here" (a folder holding
+several), name them and explain the supported way for one product in several repositories
+(README "One product, several repositories"): onboard each repository from its own folder,
+choosing the same project and board, and tag each ticket `repo:<folder name>`. Write nothing and
+call no HashOps tool here.
 
 If `hashsmith.json` exists, this run is a **refresh**:
 - Run the CLI's `check-config`. Not ok (bad JSON, merge-conflict markers, a malformed key): show
@@ -84,6 +88,9 @@ an error to retry: note it, carry on, and list it under "ask a project lead" in 
 - `repo.base_branch`: the branch the project's `CLAUDE.md` says PRs target. Otherwise
   `git rev-parse --abbrev-ref origin/HEAD` without the `origin/`; when that fails (no
   `origin/HEAD`), ask. Ask too if the two disagree.
+- `repo.branch_policy`: ask once in this step's batch: `managed` (recommended: each ticket on its
+  own `ai/*` branch, which sync and PRs follow), `current` (work on the checked-out branch, never
+  switch) or `confirm` (ask before each branch switch). A refresh keeps the stored answer.
 - `qa.base_url`: `http://localhost:<port>` from the dev script in `package.json` or the
   dev-server config (for example the Vite `server.port`). Ask if neither names a port.
 - `qa.mode`: `browser` with a `base_url`. A project with no web UI (no dev server, nothing to

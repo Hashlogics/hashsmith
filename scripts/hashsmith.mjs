@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // The Hashsmith CLI: the deterministic parts of the skills, so they never rest on the model's
-// reading of a URL, a settings file or a git state. Run from the repo root; prints one JSON line.
+// reading of a URL, a settings file or a git state. Runs at the repo's top level from any subfolder;
+// prints one JSON line.
 // The session-start hook gives skills this file's absolute path.
 //
 //   repo-slug            origin and the link URLs (a JSON array on stdin) as slugs, and which match
 //   project-candidates   the projects (list_my_projects rows, a JSON array on stdin) named like this repo, best first
 //   lists-before-todo    the board's active lists before To Do (get_board's lists on stdin), not mapped in hashsmith.json
+//   repo-match           a ticket's repo:<name> tags (its tags on stdin) against this repo's names
 //   env-keys             .env.example key names that .env / .env.local lack (names only, never values)
 //   git-switch           how .claude/settings(.local).json treat `git switch`
 //   check-config         validate hashsmith.json (exit 1 when invalid)
@@ -55,6 +57,23 @@ export function repoProbes(dirName, originUrl) {
   // An SSH host alias (github-work:org/repo.git) has no usable host, but still names the repo.
   const repo = repoSlug(originUrl)?.split("/").at(-1) ?? String(originUrl ?? "").split(/[/:]/).at(-1).replace(/\.git$/i, "");
   return [...new Set([plainName(dirName), plainName(repo)])].filter(Boolean);
+}
+
+/** A ticket's repo:<name> tags against this repo's probes (design §10, one product in several
+ *  repositories). match: true when one names this repo, false when they all name others, null
+ *  when the ticket names no repository. others: the names that are not this repo. */
+export function repoMatch(tags, probes) {
+  const repos = (Array.isArray(tags) ? tags : [])
+    .map(t => (typeof t === "string" ? /^\s*repo\s*:\s*(\S.*?)\s*$/i.exec(t)?.[1] : null))
+    .filter(Boolean);
+  const mine = name => probes.includes(plainName(name));
+  return { repos, match: repos.length === 0 ? null : repos.some(mine), others: repos.filter(r => !mine(r)) };
+}
+
+/** The tags array from stdin: the array itself, or get_task's result around it; null otherwise. */
+export function tagsFrom(input) {
+  const tags = Array.isArray(input) ? input : (input?.result?.tags ?? input?.tags);
+  return Array.isArray(tags) ? tags : null;
 }
 
 const CANDIDATE_MAX = 5;
@@ -127,6 +146,7 @@ const TICKET = /^[A-Z0-9]+-\d+$/;
 const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "learned"];
 const CHANGELOG_MODES = ["write", "commits", "off"];
 const QA_MODES = ["browser", "code", ""];
+const BRANCH_POLICIES = ["managed", "current", "confirm", ""];
 const LISTS = ["todo", "in_progress", "review", "qa", "done"];
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string";
@@ -157,6 +177,9 @@ export function checkConfig(c) {
 
   if (c.repo !== undefined && !(isObj(c.repo) && isStr(c.repo.base_branch) && c.repo.base_branch.trim()))
     e.push("repo.base_branch must be a non-empty string.");
+  // How work and qa pick a branch (design §6 work): managed ai/* branches, the checked-out one, or ask.
+  if (isObj(c.repo) && "branch_policy" in c.repo && !BRANCH_POLICIES.includes(c.repo.branch_policy))
+    e.push('repo.branch_policy must be "managed", "current", "confirm" or "" (managed).');
   // QA and design screenshots run only against a local app (design §6 qa).
   if (c.qa !== undefined && !(isObj(c.qa) && isStr(c.qa.base_url) && (c.qa.base_url === "" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/\S*)?$/.test(c.qa.base_url))))
     e.push('qa.base_url must be "" or a local URL (http://localhost:<port> or http://127.0.0.1:<port>).');
@@ -234,7 +257,8 @@ const GENERATOR_NAMES = [
   ["semantic-release", /\bsemantic-release\b/i],
   ["commit-and-tag-version", /\bcommit-and-tag-version\b/i],
   ["standard-version", /\bstandard-version\b/i],
-  ["conventional-changelog", /\bconventional-changelog\b/i],
+  // The tool itself, not packages named after it (a commitlint preset such as conventional-changelog-conventionalcommits).
+  ["conventional-changelog", /(?<![\w-])(?:conventional-changelog(?:-cli|-action)?|@release-it\/conventional-changelog)(?![\w-])/i],
   ["git-cliff", /\bgit-cliff\b/i],
   ["auto-changelog", /\bauto-changelog\b/i],
 ];
@@ -257,7 +281,7 @@ export function changelogDetect({ names = [], packageJson = null, workflows = []
     const scripts = isObj(packageJson.scripts) ? Object.values(packageJson.scripts).filter(isStr) : [];
     const text = [...deps, ...scripts].join("\n");
     generator =
-      GENERATOR_NAMES.find(([, re]) => re.test(text))?.[0] ?? GENERATOR_KEYS.find(([, key]) => packageJson[key] !== undefined)?.[0] ?? null;
+      GENERATOR_NAMES.find(([, re]) => re.test(text))?.[0] ?? GENERATOR_KEYS.find(([, key]) => isObj(packageJson[key]))?.[0] ?? null; // a config object, not any value
   }
   if (!generator) generator = GENERATOR_FILES.find(([, re]) => names.some(n => re.test(n)))?.[0] ?? null;
   if (!generator) generator = GENERATOR_NAMES.find(([, re]) => workflows.some(w => re.test(String(w))))?.[0] ?? null;
@@ -290,40 +314,74 @@ const NOT_TICKETS = new Set(["UTF", "ISO", "SHA", "RFC", "COVID", "ES", "IPV", "
  *  developer's diff.noprefix or diff.mnemonicPrefix does not hide it. */
 export function patchLines(patch, path) {
   const added = [];
+  const addedAt = []; // each added line's 1-based line number in the new file, from the @@ headers
   const removed = [];
   let inFile = false;
   let inHunk = false;
+  let at = null;
   const isPath = name => name === path || name === `${name[0]}/${path}`;
   for (const line of String(patch ?? "").split("\n")) {
     if (line.startsWith("diff --git ")) inFile = inHunk = false;
     else if (!inHunk && /^(---|\+\+\+) /.test(line)) inFile ||= isPath(line.slice(4).replace(/\t.*$/, ""));
-    else if (line.startsWith("@@")) inHunk = true;
-    else if (inFile && inHunk && line.startsWith("+")) added.push(line.slice(1));
-    else if (inFile && inHunk && line.startsWith("-")) removed.push(line.slice(1));
+    else if (line.startsWith("@@")) {
+      inHunk = true;
+      const m = /^@@ -\d+(?:,\d+)? \+(\d+)/.exec(line);
+      at = m ? Number(m[1]) : null;
+    } else if (inFile && inHunk && line.startsWith("+")) {
+      added.push(line.slice(1));
+      addedAt.push(at);
+      if (at !== null) at++;
+    } else if (inFile && inHunk && line.startsWith("-")) removed.push(line.slice(1));
+    else if (inHunk && line.startsWith(" ") && at !== null) at++;
   }
-  return { added, removed };
+  return { added, addedAt, removed };
+}
+
+// The Unreleased section of the changelog on disk, as [start, end) line indexes, or null. Its
+// heading may be #, ## or ###; it ends at the next heading of the same level or higher.
+function unreleasedRange(lines) {
+  const start = lines.findIndex(l => /^#{1,3}\s+\[?unreleased\b/i.test(l));
+  if (start === -1) return null;
+  const level = /^#+/.exec(lines[start])[0].length;
+  const next = lines.findIndex((l, i) => i > start && new RegExp(`^#{1,${level}}\\s`).test(l));
+  return [start, next === -1 ? lines.length : next];
 }
 
 /** Whether a commit type needs a changelog entry, and what a patch does wrong in the changelog:
- *  entries are for end users, and releases (version headings) belong to the project. */
-export function changelogCheck(type, patch, path) {
+ *  entries are for end users, and releases (version headings) belong to the project.
+ *  key: the project's ticket key (flag only it when known); fileText: the changelog on disk, to
+ *  check that new entries sit under Unreleased. */
+export function changelogCheck(type, patch, path, { key = null, fileText = null } = {}) {
   if (!COMMIT_TYPES.includes(type)) return { error: `commit type must be one of ${COMMIT_TYPES.join(", ")}` };
   const heading = ENTRY_HEADINGS[type] ?? null;
-  const { added, removed } = patchLines(patch, path);
+  const { added, addedAt, removed } = patchLines(patch, path);
   const problems = [];
   for (const line of added) {
     const text = line.replace(/https?:\/\/\S+/g, ""); // a link for users is fine
-    const key = [...text.matchAll(/(?<![A-Za-z0-9-])([A-Z][A-Z0-9]*)-\d+(?![\w-])/g)].find(m => !NOT_TICKETS.has(m[1]));
-    if (key) problems.push(`an added line carries the ticket key ${key[0]}; entries are for users`);
+    const own = typeof key === "string" && /^[A-Za-z0-9]+$/.test(key) ? key.toUpperCase() : null;
+    const keys = [...text.matchAll(/(?<![A-Za-z0-9-])([A-Za-z][A-Za-z0-9]*)-\d+(?![\w-])/g)];
+    const found = own ? keys.find(m => m[1].toUpperCase() === own) : keys.find(m => /^[A-Z][A-Z0-9]*$/.test(m[1]) && !NOT_TICKETS.has(m[1]));
+    if (found) problems.push(`an added line carries the ticket key ${found[0]}; entries are for users`);
     const files = text.match(/[\w@.-]+\/[\w@./-]*\.[A-Za-z0-9]{1,8}\b|\b[\w.-]+\.(?:m?[jt]sx?|json|md|css|html|sql|py|rb|go|ya?ml|toml|sh)\b/g) ?? [];
     if (files.some(f => !/^[A-Z][a-z]+\.js$/.test(f))) problems.push("an added line names a file name; describe what the user sees instead");
     if (/`[^`]+`/.test(text)) problems.push("an added line has a code span; entries are plain English");
     // A release heading names a version, a date or a release; Unreleased and "## Added" are fine.
-    if (/^#{1,6}\s/.test(line) && !/unreleased/i.test(line) && /\d|\bversion\b|\brelease\b/i.test(line))
+    if (/^#{1,6}\s/.test(line) && !/unreleased/i.test(line) && /\bv?\d+\.\d+|\b\d{4}-\d{2}-\d{2}\b|\bversion\b|\brelease\b/i.test(line))
       problems.push("an added line is a release heading; releases belong to the project's own process");
   }
   for (const line of removed)
     if (/^#{1,6}\s|^\[[^\]]+\]:\s/.test(line)) problems.push("the patch removes a section heading or its link reference; never rename or drop one");
+  // Placement: every added entry line must sit under Unreleased in the file as it is now.
+  if (typeof fileText === "string") {
+    const lines = fileText.split("\n");
+    const range = unreleasedRange(lines);
+    const isEntry = l => l.trim() && !/^#{1,6}\s|^\[[^\]]+\]:\s/.test(l);
+    const within = i => range && i > range[0] && i < range[1];
+    // By the hunk's line number when the file on disk still has that line there; else by its text.
+    const inside = (l, n) => (n !== null && lines[n - 1] === l ? within(n - 1) : lines.some((f, i) => f === l && within(i)));
+    if (added.some((l, k) => isEntry(l) && !inside(l, addedAt[k])))
+      problems.push("an added changelog line sits outside the Unreleased section; entries go under Unreleased");
+  }
   const pkg = patchLines(patch, "package.json");
   if ([...pkg.added, ...pkg.removed].some(l => /^\s*"version"\s*:/.test(l)))
     problems.push("the patch changes the version field in package.json; versions belong to the project's own process");
@@ -375,17 +433,36 @@ export function commitsForKey(log, key) {
     .split("\x1e")
     .map(r => r.replace(/^\s+/, "").split("\x1f"))
     .filter(([sha, , subject = "", body = ""]) => /^[0-9a-f]{4,40}$/.test(sha ?? "") && re.test(`${subject}\n${body}`))
-    .map(([sha, at]) => ({ sha, at: at ?? null }));
+    // A revert undoes the ticket's work: it is kept, flagged, so a newer revert can cancel delivery.
+    // A revert of a revert (older git's name for a reapply) delivers it again.
+    .map(([sha, at, subject = ""]) => {
+      const s = subject.trim();
+      return { sha, at: at ?? null, ...(/^reverts?\b/i.test(s) && !/^revert\s+"revert\b/i.test(s) ? { revert: true } : {}) };
+    });
+}
+
+// The commits that still deliver the ticket, newest first: those newer than its newest revert.
+// A revert newer than all of them leaves none, and `reverted` says why.
+function delivering(commits) {
+  const i = commits.findIndex(c => c.revert);
+  return { live: (i === -1 ? commits : commits.slice(0, i)).map(({ sha, at }) => ({ sha, at })), reverted: i === 0 };
 }
 
 /** A key with no ai/* branch, from commits carrying it on origin/<base> and on the local <base>
- *  (newest first): base-pushed beats base-local; neither stays no-branch (design §4).
- *  `pushed_commits` lists every pushed one, oldest first. No base
+ *  (newest first): base-pushed when origin has the newest one, base-local when only the local base
+ *  has it, otherwise no-branch (design §4). A revert newer than the ticket's commits cancels them;
+ *  `base.reverted` says where: "pushed" (on origin) or "local" (only on the local base, unpushed). `pushed_commits` lists every pushed one still delivering, oldest first. No base
  *  branch in the config: `base: null`, so nobody reads "not found" into "not searched". */
-export function baseStateFor(base, pushed, local) {
+export function baseStateFor(base, pushedAll, localAll) {
   const none = { branch: null, pr: null, state: "no-branch", ambiguous: false };
   if (!base) return { ...none, base: null };
-  const state = pushed.length ? "base-pushed" : local.length ? "base-local" : "no-branch";
+  const p = delivering(pushedAll);
+  const l = delivering(localAll);
+  const pushed = p.live;
+  const local = l.live;
+  // The newest commit decides: a local fix newer than anything pushed is not delivered yet.
+  const unpushed = local.length && !pushed.some(p => p.sha === local[0].sha);
+  const state = pushed.length && !unpushed ? "base-pushed" : local.length ? "base-local" : "no-branch";
   return {
     ...none,
     state,
@@ -396,8 +473,16 @@ export function baseStateFor(base, pushed, local) {
       local: local[0]?.sha ?? null,
       local_at: local[0]?.at ?? null,
       pushed_commits: pushed.map(c => c.sha).reverse(), // oldest first: the ticket's code, for qa's code mode
+      ...(p.reverted ? { reverted: "pushed" } : l.reverted && !pushedAll.some(c => c.sha === localAll[0].sha) ? { reverted: "local" } : {}),
     },
   };
+}
+
+/** An ai/* branch with no PR yet hides nothing: a pushed base-branch commit carrying the key wins.
+ *  The work is then base-branch work: `branch` is null, and the leftover branch is `stale_branch`. */
+export function withBase(branchState, baseState) {
+  if (branchState?.state !== "review" || branchState.ambiguous || baseState?.state !== "base-pushed") return branchState;
+  return { ...baseState, stale_branch: branchState.branch };
 }
 
 /** `git status --porcelain -z` → clean flag and the changed paths, exactly as on disk. */
@@ -483,6 +568,25 @@ const COMMANDS = {
     const probes = repoProbes(basename(top), originUrl);
     return { probes, candidates: projectCandidates(projects, probes) };
   },
+  // Tags come from HashOps too (anyone on the board can add one): stdin only.
+  "repo-match": () => {
+    let originUrl = null;
+    try {
+      originUrl = sh("git", ["config", "--get", "remote.origin.url"]);
+    } catch {
+      // no origin remote
+    }
+    const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
+    let tags;
+    try {
+      tags = tagsFrom(JSON.parse(input));
+    } catch {
+      tags = null;
+    }
+    if (!tags) return { error: "stdin must be the ticket's tags: a JSON array, or get_task's result" };
+    const probes = repoProbes(basename(repoTop()), originUrl);
+    return { probes, ...repoMatch(tags, probes) };
+  },
   // List names come from HashOps too: stdin only. Takes the lists array, or the board around it.
   "lists-before-todo": () => {
     const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
@@ -520,14 +624,18 @@ const COMMANDS = {
     // Work done straight on the base branch has no ai/* branch: look for the key in its commits.
     const config = tryJson("hashsmith.json");
     const base = isStr(config?.repo?.base_branch) && config.repo.base_branch.trim() ? config.repo.base_branch.trim() : null;
-    const baseLog = ref => {
+    // Only the commits that mention the key, however old: git's --grep narrows, commitsForKey matches
+    // exactly. The key is a checked KEY-n before it reaches the command line.
+    const baseLog = (ref, key) => {
+      if (!/^[A-Za-z0-9]+-\d+$/.test(key)) return "";
       try {
-        return raw("git", ["log", ref, "-n", "200", "--format=%h%x1f%cI%x1f%s%x1f%b%x1e", "--"]);
+        return raw("git", ["log", ref, "-i", "-F", `--grep=${key}`, "--format=%h%x1f%cI%x1f%s%x1f%b%x1e", "--"]);
       } catch {
         return ""; // no such ref yet (no commits, or never fetched)
       }
     };
-    const logs = base ? { pushed: baseLog(`refs/remotes/origin/${base}`), local: baseLog(`refs/heads/${base}`) } : { pushed: "", local: "" };
+    const logsFor = key =>
+      base ? { pushed: baseLog(`refs/remotes/origin/${base}`, key), local: baseLog(`refs/heads/${base}`, key) } : { pushed: "", local: "" };
     const out = {};
     for (const key of keys) {
       const entries = [];
@@ -541,8 +649,9 @@ const COMMANDS = {
           return { error: "gh unavailable", hint: "Install gh and run `gh auth login`, or use /hashsmith:sync KEY-12 reviewed." };
         }
       }
-      out[key] =
-        entries.length === 0 ? baseStateFor(base, commitsForKey(logs.pushed, key), commitsForKey(logs.local, key)) : ticketStateFor(entries);
+      const logs = logsFor(key);
+      const baseState = baseStateFor(base, commitsForKey(logs.pushed, key), commitsForKey(logs.local, key));
+      out[key] = entries.length === 0 ? baseState : withBase(ticketStateFor(entries), baseState);
     }
     return out;
   },
@@ -565,7 +674,8 @@ const COMMANDS = {
     if (!COMMIT_TYPES.includes(type)) return { error: `commit type must be one of ${COMMIT_TYPES.join(", ")}` };
     if (log.mode !== "write") return { mode: log.mode, path: log.path, needs_entry: false };
     const patch = process.stdin.isTTY ? "" : readFileSync(0, "utf8");
-    return { mode: log.mode, path: log.path, ...changelogCheck(type, patch, log.path) };
+    const fileText = tryRead(join(repoTop(), log.path));
+    return { mode: log.mode, path: log.path, ...changelogCheck(type, patch, log.path, { key: config?.hashops?.project_key ?? null, fileText }) };
   },
   // The plugin's own files, wherever the CLI runs from: feedback is filed from any repo.
   "feedback-target": () =>
@@ -581,6 +691,9 @@ if (isMain(import.meta.url)) {
     process.stderr.write(`usage: hashsmith.mjs <${Object.keys(COMMANDS).join("|")}> [args]\n`);
     process.exit(2);
   }
+  // Every command reads the repo's root files (hashsmith.json, .env.example, …), even from a subfolder.
+  const top = repoTop();
+  if (top !== process.cwd()) process.chdir(top);
   const result = COMMANDS[cmd](args);
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if ((cmd === "check-config" || cmd === "feedback-target") && !result.ok) process.exit(1);

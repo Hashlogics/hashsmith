@@ -10,8 +10,8 @@ own way, verify until green, and hand off. The board shows every step. Hashsmith
 developer reviews the unstaged change.
 
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools. "The CLI" is the
-`Hashsmith CLI` line in your session context. Read `hashops.*`, `repo.base_branch` and
-`qa.base_url` from `hashsmith.json` (run the CLI's `check-config` first; invalid or missing →
+`Hashsmith CLI` line in your session context. Read `hashops.*`, `repo.base_branch`,
+`repo.branch_policy` and `qa.base_url` from `hashsmith.json` (run the CLI's `check-config` first; invalid or missing →
 propose `/hashsmith:onboard-project` and stop).
 
 ## 1. Choose the tickets
@@ -27,13 +27,16 @@ propose `/hashsmith:onboard-project` and stop).
 **Resuming.** A named ticket is a resume when it is in `lists.in_progress` and has a "Plan
 (Hashsmith)" comment. Run CLI `tree` and `ticket-state <KEY>`; its `ai/*` branches are `branch`
 and every `branches[].branch`.
-- **On one of them** (`tree.branch`): read it as in step 2.1, compare its plan with
+- **On one of them** (`tree.branch`): read it as in step 2.1, `git fetch origin`, compare its plan with
   `git diff $(git merge-base HEAD origin/<base_branch>)` plus the untracked files (as in §7.1, so
   committed work counts as done), and show the brief (step 2.3) with "Done / left" as its last
   line. After a yes, go on at §5 (Implement) for what is left, or at §6 (Self-review) when
   nothing is: no new plan, no new branch, no board update.
 - **Not on one of them:** never plan it again or cut a second branch. With a clean tree, offer
   `git switch <branch>` to its branch (ask which when there are several), then resume as above.
+- **No `ai/*` branch, and the plan names another branch** (`current`, or `confirm` after a no):
+  never switch. On that branch, resume as above but compare the plan with `git diff HEAD` plus
+  the untracked files; on any other branch, ask the developer to switch to it.
 
 ## 2. Plan (the execution plan)
 
@@ -61,11 +64,26 @@ For each ticket or group:
 4. Ask what is still unclear, in one batch with options and a recommendation.
 5. Write the plan: the acceptance criteria restated, the files to change with one line each, the
    tests to add, the checks that will prove it, and for UI tickets that `/hashsmith:design` runs.
+   A ticket tagged for other repositories too (the assessment's `repo-match`) covers this one's
+   part only; the plan lists the other parts, each done from its own repository's session.
    End it with "On yes I will:" and the branch (§3), adding the `ai_tag` tag, the move to In
    Progress and posting this plan. Show it and wait for a yes. A no or an edit changes the plan,
    not the ticket.
 
 ## 3. Branch
+
+Read `repo.branch_policy` (empty or missing: `managed`). Whatever the policy, the plan's "On yes
+I will:" names the branch the work goes on.
+- **`current`:** never switch. The work goes on `tree.branch`, whatever it is, and the tree may
+  hold the developer's other changes (their call): note `tree.files` now, so the handoff lists
+  them under "Left for the developer" as not this ticket's. Skip steps 1–2. Say once that sync follows the
+  ticket through its key in the commit message: it reaches QA when that commit is on
+  `origin/<base_branch>`.
+- **`managed`** (today's rules) and **`confirm`:** steps 1–2. Under `confirm`, ask before each
+  `git switch`, naming the branch and what it is cut from; on a no, ask which branch to use, or
+  stay on the current one as under `current`.
+
+"Another branch" below means one that is neither the base nor the ticket's `ai/*` branch.
 
 1. CLI `tree`. Not clean: do not switch (the uncommitted change would follow you, and it would
    end up in this ticket's patch). If `tree.branch` is an `ai/*` branch whose ticket is in Review,
@@ -133,16 +151,18 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
 
 1. Save the diff outside the repo, new files included, without touching the index:
    `P=~/.hashsmith/projects/<project_key>/handoffs/<branch with / as ->.patch` (for example
-   `handoffs/ai-ACME-12-balance-card.patch`; on the base branch, `<base>-<KEY>.patch`, so two
-   tickets never share one file), `mkdir -p` its folder,
+   `handoffs/ai-ACME-12-balance-card.patch`; on the base branch or any branch that is not the
+   ticket's own `ai/*` one, `<branch with / as ->-<KEY>.patch`, so two tickets never share one
+   file), `mkdir -p` its folder,
    `git diff $(git merge-base HEAD origin/<base_branch>) > "$P"` (also catches anything the
-   developer staged), then for each file from `git ls-files --others --exclude-standard`:
+   developer staged; on another branch, `git diff HEAD > "$P"`, since that branch may carry other
+   work), then for each file from `git ls-files --others --exclude-standard`:
    `git diff --no-index /dev/null <file> >> "$P"` (exit code 1 is normal there).
 2. Write the handoff, following `reference/handoff-template.md`: what changed, how to verify (one
    step per criterion; `qa` runs these), screenshots for UI, the verification report, what is left
    for the developer, a draft PR description, the commit message (every ticket key in its
    subject), the `Changelog:` line (none in `off` mode), and the git line (its base-branch form
-   when the developer asked for the work on the base branch).
+   when the work stayed on the base branch, its current-branch form on another branch).
 3. Show it with the proposed move to Review and ask for one yes. Then `comment_on_task` with it
    and `move_task` to `lists.review`.
 4. Tell the developer: the changed files (`git status --short`), the verification result, the
@@ -155,7 +175,8 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
 If the developer asks for changes in the same session, make them, run step 6 again, then update
 the saved patch, and offer a short "Handoff updated" comment with what changed, the new
 verification lines and the commit message, rewritten to cover the whole change (posted after a
-yes). Rewrite this change's line under Unreleased (§5) and the handoff's `Changelog:` line too.
+yes); show that commit message in chat in a code block too, as in §7.4. Rewrite this change's line
+under Unreleased (§5) and the handoff's `Changelog:` line too.
 The ticket stays in Review.
 
 ## 9. Lessons and config
