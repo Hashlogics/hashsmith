@@ -33,8 +33,9 @@ branch: the newest commit whose message carries the key on `origin/<base_branch>
 `base.reverted`: a revert newer than the ticket's commits. `"pushed"`: with `no-branch`, report
 "reverted on <base>" and propose no move; with `base-local`, a newer local commit delivers it
 again once pushed. `"local"`: a revert not pushed yet; origin still has the work: report it.
-`stale_branch`: an `ai/*` branch with no PR whose work reached the base branch anyway; report it
-as left over for the developer to delete. When several branches carry the key it sets
+`stale_branch`: an `ai/*` branch with no PR and no work of its own (no commits off
+origin/<base>, no uncommitted changes on it), while a pushed base-branch commit carries the key;
+report it as left over for the developer to delete. When several branches carry the key it sets
 `ambiguous: true` and lists them all under `branches`: **propose no move for that ticket**; report
 the branches and their PRs and let the developer say which one is current.
 
@@ -60,17 +61,17 @@ moves those from Review to QA after a yes. Do nothing else.
 | `base-pushed` | QA | stays | waiting for `/hashsmith:qa` |
 | `base-local` | QA | stays | warn: in QA but its commit on <base> is not pushed |
 
-**Whose uncommitted change.** A `no-branch` ticket's saved patch is
-`~/.hashsmith/projects/<project_key>/handoffs/<tree.branch with / as ->-<KEY>.patch` (on the base
-branch, or on another branch under `repo.branch_policy` `current`/`confirm`). With a dirty tree,
-it is reported "still in the working tree (uncommitted)" only when `tree.files` share a path with
-that patch,
-leaving out `changelog.path` (`CHANGELOG.md` when no `changelog` key is stored) and `hashsmith.json`:
-any ticket's patch may touch them. With
-a clean tree on a branch other than the base where that patch exists, report "committed on
-<branch>; waiting to reach origin/<base>". Any other clean tree: report that no `ai/*` branch or
-base-branch commit carries the key (renamed branch, or a commit without the key?). Otherwise: "tree not clean on <branch>; cannot tell whether it is
-this ticket's work".
+**Whose uncommitted change.** A `no-branch` ticket's saved patch comes from CLI `handoff-patch
+<KEY>…`: the newest base- or other-branch patch, whatever branch it was made on, with `branch`
+(that branch, `/` written as `-`) and `current` (made on the checked-out one). With a dirty tree
+and `current: true`, it is reported "still in the working tree (uncommitted)" only when
+`tree.files` share a path with that patch, leaving out
+`changelog.path` (`CHANGELOG.md` when no `changelog` key is stored) and `hashsmith.json`: any
+ticket's patch may touch them. With a clean tree and a patch whose `branch` is not the base,
+report "handed off on <branch>; no commit carrying the key on origin/<base> yet (committed, or set
+aside?)". Any other clean tree: report that no `ai/*` branch or base-branch commit carries the key
+(renamed branch, or a commit without the key?). Otherwise: "tree not clean on <branch>; cannot
+tell whether it is this ticket's work".
 
 Hashsmith never moves a ticket to Done here; only `qa` does, after QA passes.
 

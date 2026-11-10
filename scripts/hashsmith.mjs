@@ -14,11 +14,13 @@
 //   tree                 working-tree state and current branch
 //   ticket-state KEY...  each ticket's ai/* branch (local or on origin) and PR, mapped to the design §4 states;
 //                        with no branch, commits carrying the key on repo.base_branch (base-pushed / base-local)
+//   handoff-patch KEY... each ticket's newest saved base- or other-branch patch under ~/.hashsmith, and its branch
 //   feedback-target      the Hashsmith feedback board, list and tags, and the plugin version (exit 1 when invalid)
 //   changelog            how this project keeps its changelog: stored in hashsmith.json, else detected (names only)
 //   changelog-check TYPE the commit type's changelog heading, and what the patch on stdin does to the changelog
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain } from "../hooks/lib.mjs";
@@ -308,6 +310,11 @@ const ENTRY_HEADINGS = { feat: "Added", fix: "Fixed", perf: "Improved" };
 
 // Standards and names that look like ticket keys but belong in a user's sentence.
 const NOT_TICKETS = new Set(["UTF", "ISO", "SHA", "RFC", "COVID", "ES", "IPV", "MP", "WCAG", "GPT", "PS", "HTTP", "TLS"]);
+// A date written out with a year ("5 November 2026", "Nov 2026", "November 5, 2026"); a month word
+// with no year ("March fixes") is not one.
+const MONTH =
+  "(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\\b\\.?";
+const WRITTEN_DATE = new RegExp(`\\b${MONTH}\\s+(?:\\d{1,2},?\\s+)?\\d{4}\\b|\\b\\d{1,2}\\s+${MONTH}\\s+\\d{4}\\b`, "i");
 
 /** The lines a unified diff adds to and removes from one root file, hunk bodies only. The file is
  *  read from the ---/+++ lines, with or without a one-letter prefix (a/, b/, c/, w/ or none), so a
@@ -366,7 +373,7 @@ export function changelogCheck(type, patch, path, { key = null, fileText = null 
     if (files.some(f => !/^[A-Z][a-z]+\.js$/.test(f))) problems.push("an added line names a file name; describe what the user sees instead");
     if (/`[^`]+`/.test(text)) problems.push("an added line has a code span; entries are plain English");
     // A release heading names a version, a date or a release; Unreleased and "## Added" are fine.
-    if (/^#{1,6}\s/.test(line) && !/unreleased/i.test(line) && /\bv?\d+\.\d+|\b\d{4}-\d{2}-\d{2}\b|\bversion\b|\brelease\b/i.test(line))
+    if (/^#{1,6}\s/.test(line) && !/unreleased/i.test(line) && (/\bv?\d+\.\d+|\b\d{4}-\d{2}-\d{2}\b|\bversion\b|\brelease\b/i.test(line) || WRITTEN_DATE.test(line)))
       problems.push("an added line is a release heading; releases belong to the project's own process");
   }
   for (const line of removed)
@@ -434,10 +441,16 @@ export function commitsForKey(log, key) {
     .map(r => r.replace(/^\s+/, "").split("\x1f"))
     .filter(([sha, , subject = "", body = ""]) => /^[0-9a-f]{4,40}$/.test(sha ?? "") && re.test(`${subject}\n${body}`))
     // A revert undoes the ticket's work: it is kept, flagged, so a newer revert can cancel delivery.
-    // A revert of a revert (older git's name for a reapply) delivers it again.
+    // A revert is git's `Revert "…"` subject (GitHub's revert PRs use it too) or a conventional
+    // `revert:` type; a plain "Revert button colours" is a change. A revert of a revert (older
+    // git's name for a reapply) delivers it again: an odd number of nested `Revert "` reverts.
     .map(([sha, at, subject = ""]) => {
       const s = subject.trim();
-      return { sha, at: at ?? null, ...(/^reverts?\b/i.test(s) && !/^revert\s+"revert\b/i.test(s) ? { revert: true } : {}) };
+      const lead = /^(?:revert\s+")*/i.exec(s)[0];
+      // A conventional `revert:` inside the quotes is one more level: git's revert of it reapplies.
+      const levels = (lead.match(/revert/gi) ?? []).length + (/^revert(?:\([^)]*\))?!?:/i.test(s.slice(lead.length)) ? 1 : 0);
+      const revert = levels % 2 === 1;
+      return { sha, at: at ?? null, ...(revert ? { revert: true } : {}) };
     });
 }
 
@@ -460,9 +473,10 @@ export function baseStateFor(base, pushedAll, localAll) {
   const l = delivering(localAll);
   const pushed = p.live;
   const local = l.live;
-  // The newest commit decides: a local fix newer than anything pushed is not delivered yet.
-  const unpushed = local.length && !pushed.some(p => p.sha === local[0].sha);
-  const state = pushed.length && !unpushed ? "base-pushed" : local.length ? "base-local" : "no-branch";
+  // The newest commit decides: a local fix newer than anything pushed is not delivered yet. A local
+  // commit origin already has (then reverted there) is not unpushed: the local base is only behind.
+  const unpushed = local.length && !pushedAll.some(p => p.sha === local[0].sha);
+  const state = unpushed ? "base-local" : pushed.length ? "base-pushed" : "no-branch";
   return {
     ...none,
     state,
@@ -478,11 +492,30 @@ export function baseStateFor(base, pushedAll, localAll) {
   };
 }
 
-/** An ai/* branch with no PR yet hides nothing: a pushed base-branch commit carrying the key wins.
- *  The work is then base-branch work: `branch` is null, and the leftover branch is `stale_branch`. */
-export function withBase(branchState, baseState) {
+/** An ai/* branch with no PR hides no base-branch work: when the branch holds no work of its own
+ *  (`tip.ahead`: its commits not on origin/<base>, local or origin copy, is 0; and it is not checked
+ *  out with uncommitted changes, `tip.dirty`), a pushed base-branch commit carrying the key wins.
+ *  The work is then base-branch work: `branch` is null, and the leftover branch is `stale_branch`.
+ *  A branch with its own commits, a waiting uncommitted handoff on it, or an unknown tip stays, so
+ *  a teammate's "fix seen while testing ACME-22" on the base never replaces live work. */
+export function withBase(branchState, baseState, tip) {
   if (branchState?.state !== "review" || branchState.ambiguous || baseState?.state !== "base-pushed") return branchState;
+  if (tip?.ahead !== 0 || tip.dirty !== false) return branchState;
   return { ...baseState, stale_branch: branchState.branch };
+}
+
+/** The ticket's newest saved patch from base- or other-branch work, `<branch with / as ->-<KEY>.patch`
+ *  in the handoffs folder (`names`: [{name, mtimeMs}]), whatever branch is checked out; ai/* branch
+ *  patches (named after the branch, `ai-<KEY-n>-…`) are not this kind. `current`: made on `branch`. */
+export function handoffPatch(names, key, branch) {
+  if (!/^[A-Za-z0-9]+-\d+$/.test(String(key ?? ""))) return null;
+  const suffix = `-${key}.patch`;
+  const hit = names
+    .filter(f => f.name.endsWith(suffix) && f.name.length > suffix.length && !/^ai-[A-Za-z0-9]+-\d+-/.test(f.name))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+  if (!hit) return null;
+  const prefix = hit.name.slice(0, -suffix.length);
+  return { file: hit.name, branch: prefix, current: String(branch ?? "").replaceAll("/", "-") === prefix };
 }
 
 /** `git status --porcelain -z` → clean flag and the changed paths, exactly as on disk. */
@@ -634,6 +667,22 @@ const COMMANDS = {
         return ""; // no such ref yet (no commits, or never fetched)
       }
     };
+    // Does an ai/* branch hold work of its own (withBase)? Its commits not on origin/<base>, in its
+    // local and origin copies, and uncommitted changes when it is checked out. Unknown: null.
+    const tipOf = branch => {
+      try {
+        const current = sh("git", ["branch", "--show-current"]);
+        const dirty = current === branch && raw("git", ["status", "--porcelain", "-z"]).length > 0;
+        let ahead = 0;
+        for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
+          if (!refs(ref).length) continue;
+          ahead = Math.max(ahead, Number(sh("git", ["rev-list", "--count", `refs/remotes/origin/${base}..${ref}`, "--"])));
+        }
+        return base && Number.isFinite(ahead) ? { ahead, dirty } : null;
+      } catch {
+        return null;
+      }
+    };
     const logsFor = key =>
       base ? { pushed: baseLog(`refs/remotes/origin/${base}`, key), local: baseLog(`refs/heads/${base}`, key) } : { pushed: "", local: "" };
     const out = {};
@@ -651,7 +700,27 @@ const COMMANDS = {
       }
       const logs = logsFor(key);
       const baseState = baseStateFor(base, commitsForKey(logs.pushed, key), commitsForKey(logs.local, key));
-      out[key] = entries.length === 0 ? baseState : withBase(ticketStateFor(entries), baseState);
+      const branchState = entries.length === 0 ? null : ticketStateFor(entries);
+      out[key] = branchState ? withBase(branchState, baseState, branchState.state === "review" ? tipOf(branchState.branch) : null) : baseState;
+    }
+    return out;
+  },
+  // A ticket's saved base- or other-branch patch, so sync never globs or guesses (work §7.1).
+  "handoff-patch": keys => {
+    const projectKey = tryJson("hashsmith.json")?.hashops?.project_key;
+    if (!isStr(projectKey) || !/^[A-Za-z0-9]+$/.test(projectKey)) return { error: "no hashops.project_key in hashsmith.json" };
+    const dir = join(homedir(), ".hashsmith", "projects", projectKey, "handoffs");
+    let names = [];
+    try {
+      names = readdirSync(dir).map(name => ({ name, mtimeMs: statSync(join(dir, name)).mtimeMs }));
+    } catch {
+      // no handoffs yet
+    }
+    const branch = sh("git", ["branch", "--show-current"]);
+    const out = {};
+    for (const key of keys) {
+      const hit = handoffPatch(names, key, branch);
+      out[key] = hit ? { path: join(dir, hit.file), branch: hit.branch, current: hit.current } : null;
     }
     return out;
   },

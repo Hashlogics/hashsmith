@@ -352,6 +352,9 @@ describe("changelog check", () => {
     assert.equal(heading("### 2FA fixes"), false);
     assert.equal(heading("### Added"), false);
     for (const h of ["## 1.2.0", "## [1.2.0] - 2026-11-05", "## v2.0", "## 2026-11-05", "## Release candidate", "## Version 3"]) assert.equal(heading(h), true, h);
+    for (const h of ["## 5 November 2026", "## Nov 2026", "## November 5, 2026", "## Sept. 2026"]) assert.equal(heading(h), true, `a written date: ${h}`);
+    for (const h of ["### March fixes", "### May the exports work", "### Separate 2048-bit keys", "### Marketing 2026 campaign", "### Decimal 1000 support"])
+      assert.equal(heading(h), false, `not a written date: ${h}`);
   });
   it("with the project key known, flags only that key, so product names like USB-3 pass", () => {
     const line = l => code + patch("CHANGELOG.md", ` ## Unreleased\n+- ${l}\n`);
@@ -538,10 +541,24 @@ describe("work on the base branch", () => {
     assert.deepEqual(cli.commitsForKey(l, "HSM-1").map(c => c.sha), ["1111111", "2222222", "3333333"]);
   });
   it("flags revert commits, so a revert never counts as delivering the ticket", () => {
-    const l = [["5555555", "d", 'Revert "Revert "feat: balance card (HSM-1)""', ""], ["1111111", "d", 'Revert "feat: balance card (HSM-1)"', "This reverts commit abc."], ["2222222", "d", "revert: balance card (HSM-1)", ""], ["4444444", "d", "Reverts HSM-1 card", ""], ["3333333", "d", "fix: follow-up to HSM-1", ""]]
+    const l = [
+      ["6666666", "d", 'Revert "Revert "Revert "feat: balance card (HSM-1)"""', ""],
+      ["5555555", "d", 'Revert "Revert "feat: balance card (HSM-1)""', ""],
+      ["1111111", "d", 'Revert "feat: balance card (HSM-1)" (#45)', "This reverts commit abc."],
+      ["2222222", "d", "revert: balance card (HSM-1)", ""],
+      ["7777777", "d", "revert(card)!: balance card (HSM-1)", ""],
+      ["9999999", "d", 'Revert "revert: balance card (HSM-1)"', ""],
+      ["4444444", "d", "Revert button colours to the brand palette (HSM-1)", ""],
+      ["8888888", "d", "Reverts HSM-1 card", ""],
+      ["3333333", "d", "fix: follow-up to HSM-1", ""],
+    ]
       .map(r => r.join("\x1f"))
       .join("\x1e\n");
-    assert.deepEqual(cli.commitsForKey(l, "HSM-1").map(c => [c.sha, !!c.revert]), [["5555555", false], ["1111111", true], ["2222222", true], ["4444444", true], ["3333333", false]], "a revert of a revert delivers again");
+    assert.deepEqual(
+      cli.commitsForKey(l, "HSM-1").map(c => [c.sha, !!c.revert]),
+      [["6666666", true], ["5555555", false], ["1111111", true], ["2222222", true], ["7777777", true], ["9999999", false], ["4444444", false], ["8888888", false], ["3333333", false]],
+      'git\'s Revert "…" form (an odd number of them) and a conventional revert: type are reverts; a revert of a revert delivers; a plain word "Revert" in a subject is a change',
+    );
   });
   it("lets a revert newer than the ticket's commits cancel them, and a newer commit deliver again", () => {
     const c = (sha, revert) => ({ sha, at: "t", ...(revert ? { revert } : {}) });
@@ -560,6 +577,8 @@ describe("work on the base branch", () => {
     assert.deepEqual([redo.state, redo.base.reverted], ["base-local", "pushed"], "reverted on origin, delivered again locally");
     const behind = cli.baseStateFor("main", [c("ccccccc"), c("bbbbbbb", true), c("aaaaaaa")], [c("bbbbbbb", true), c("aaaaaaa")]);
     assert.deepEqual([behind.state, "reverted" in behind.base], ["base-pushed", false], "a local base behind origin is no local revert");
+    const stale = cli.baseStateFor("main", [c("bbbbbbb", true), c("aaaaaaa")], [c("aaaaaaa")]);
+    assert.deepEqual([stale.state, stale.base.reverted], ["no-branch", "pushed"], "a local base behind a pushed revert: pushed, then reverted, not 'not pushed yet'");
   });
   it("never returns message text as a sha, even when a message carries the separators", () => {
     const evil = `aaaaaaa\x1fd\x1ffeat (HSM-1)\x1fbody\x1e\nnot-a-sha; rm -rf /\x1fd\x1fHSM-1\x1f\x1e\n`;
@@ -590,17 +609,31 @@ describe("work on the base branch", () => {
     const behind = cli.baseStateFor("main", [c("f00d123", "x"), c("a1b2c3d", "y")], [c("a1b2c3d", "y")]);
     assert.equal(behind.state, "base-pushed", "a local branch that is only behind origin is still delivered");
   });
-  it("lets a pushed base-branch commit win over an ai/* branch that has no PR", () => {
+  it("lets a pushed base-branch commit win over an ai/* branch with no PR only when that branch holds no work of its own", () => {
     const review = { branch: "ai/HSM-1-x", pr: null, state: "review", ambiguous: false, local: true };
-    const pushed = cli.baseStateFor("main", [{ sha: "a1b2c3d", at: "t" }], []);
-    assert.deepEqual(cli.withBase(review, pushed), { ...pushed, stale_branch: "ai/HSM-1-x" }, "base-branch work: no branch to switch to");
-    assert.equal(cli.withBase(review, pushed).branch, null);
-    const local = cli.baseStateFor("main", [], [{ sha: "a1b2c3d", at: "t" }]);
-    assert.deepEqual(cli.withBase(review, local), review, "only a pushed commit counts");
+    const pushed = cli.baseStateFor("main", [{ sha: "a1b2c3d", at: "2026-11-05T10:00:00+05:00" }], []);
+    const empty = { ahead: 0, dirty: false };
+    assert.deepEqual(cli.withBase(review, pushed, empty), { ...pushed, stale_branch: "ai/HSM-1-x" }, "nothing on the branch: the work went to the base branch");
+    assert.equal(cli.withBase(review, pushed, empty).branch, null);
+    assert.deepEqual(cli.withBase(review, pushed, { ahead: 2, dirty: false }), review, "the branch has its own commits: a teammate's mention on the base never replaces it");
+    assert.deepEqual(cli.withBase(review, pushed, { ahead: 0, dirty: true }), review, "checked out with uncommitted work (a handoff waiting for its commit): keep it");
+    assert.deepEqual(cli.withBase(review, pushed, null), review, "unknown: keep the branch");
+    assert.deepEqual(cli.withBase(review, pushed, { ahead: "x", dirty: false }), review);
+    const local = cli.baseStateFor("main", [], [{ sha: "a1b2c3d", at: "2026-11-05T10:00:00+05:00" }]);
+    assert.deepEqual(cli.withBase(review, local, empty), review, "only a pushed commit counts");
     const qa = { ...review, state: "qa", pr: { number: 4 } };
-    assert.deepEqual(cli.withBase(qa, pushed), qa, "an open PR is followed through its PR");
-    assert.deepEqual(cli.withBase({ ...review, ambiguous: true }, pushed), { ...review, ambiguous: true });
-    assert.deepEqual(cli.withBase(review, cli.baseStateFor(null, [], [])), review);
+    assert.deepEqual(cli.withBase(qa, pushed, empty), qa, "an open PR is followed through its PR");
+    assert.deepEqual(cli.withBase({ ...review, ambiguous: true }, pushed, empty), { ...review, ambiguous: true }, "several branches: sync asks which is current");
+    assert.deepEqual(cli.withBase(review, cli.baseStateFor(null, [], []), empty), review);
+  });
+  it("finds a ticket's newest saved base- or other-branch patch, never an ai/* branch's", () => {
+    const f = (name, mtimeMs) => ({ name, mtimeMs });
+    const names = [f("main-HSM-1.patch", 1), f("feature-payments-HSM-1.patch", 3), f("ai-HSM-3-follow-up-HSM-1.patch", 9), f("main-HSM-12.patch", 9), f("main-HSM-1-r2.patch", 9)];
+    assert.deepEqual(cli.handoffPatch(names, "HSM-1", "feature/payments"), { file: "feature-payments-HSM-1.patch", branch: "feature-payments", current: true });
+    assert.deepEqual(cli.handoffPatch(names, "HSM-1", "main"), { file: "feature-payments-HSM-1.patch", branch: "feature-payments", current: false }, "the newest, whatever branch is checked out");
+    assert.equal(cli.handoffPatch(names, "HSM-2", "main"), null);
+    assert.equal(cli.handoffPatch([...names, f("ai-search-HSM-1.patch", 5)], "HSM-1", "ai-search").file, "ai-search-HSM-1.patch", "a branch merely starting with ai- is another branch");
+    assert.equal(cli.handoffPatch(names, "../x", "main"), null, "a key that is not KEY-n finds nothing");
   });
   it("says when no base branch was searched", () => {
     assert.deepEqual(cli.baseStateFor(null, [], []), { branch: null, pr: null, state: "no-branch", ambiguous: false, base: null });
@@ -714,6 +747,20 @@ describe("CLI", () => {
     assert.deepEqual(JSON.parse(r.stdout)["ACME-1"], {
       branch: null, pr: null, state: "no-branch", ambiguous: false, base: { branch: "main", pushed: null, pushed_at: null, local: null, local_at: null, pushed_commits: [] },
     });
+  });
+  it("handoff-patch prints the ticket's newest saved patch under ~/.hashsmith for this project", () => {
+    const dir = fixtureRepo();
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ hashops: { project_key: "ACME" } }));
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const handoffs = join(home, ".hashsmith", "projects", "ACME", "handoffs");
+    mkdirSync(handoffs, { recursive: true });
+    writeFileSync(join(handoffs, "dev-ACME-1.patch"), "diff\n");
+    const r = spawnSync(process.execPath, [CLI, "handoff-patch", "ACME-1", "ACME-2"], { cwd: dir, encoding: "utf8", env: { ...process.env, HOME: home } });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out["ACME-1"].path, join(handoffs, "dev-ACME-1.patch"));
+    assert.equal(out["ACME-1"].branch, "dev");
+    assert.equal(out["ACME-2"], null);
   });
   it("changelog reads the repo's top level and prints names only, never file text", () => {
     const dir = fixtureRepo();

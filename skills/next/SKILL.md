@@ -61,8 +61,8 @@ stop on uncommitted changes. Under `current`, choices 1 and 4 need no clean tree
 4. **Work the next ticket:** `/hashsmith:work <KEY>` for the top To Do ticket, naming the next two
    as alternatives. When To Do is empty, the top ticket from the lists before To Do instead,
    naming its list and the next two: choosing any of them is the yes to `move_task` that ticket
-   to `lists.todo` (say so in one line), then run `work`. Only on a clean tree: otherwise nothing
-   moves.
+   to `lists.todo` (say so in one line), then run `work`. Only on a clean tree, or under `current`:
+   otherwise nothing moves.
 5. **New requirements:** `/hashsmith:intake`, when the developer has notes, a doc, a Slack thread
    or a meeting to turn into tickets.
 

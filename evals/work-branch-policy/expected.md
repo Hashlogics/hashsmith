@@ -4,3 +4,6 @@
 - [ ] B: before any switch, asks with the proposed `ai/ACME-30-…` name and that it is cut from `origin/dev`; on a no, asks which branch to use or stays on `feature/payments`.
 - [ ] C: today's behaviour: proposes `git switch --no-track -c ai/ACME-30-… origin/dev` in the plan, and the switch prompt follows.
 - [ ] In every run, nothing changes before the plan's yes.
+- [ ] D: notes `docs/notes.md` before any change; the handoff patch leaves it out (`git diff HEAD -- <the ticket's paths>`), and the handoff lists it under "Left for the developer" as not this ticket's.
+- [ ] E: runs `ticket-state ACME-31`, sees the open PR, and asks the developer to switch to `ai/ACME-31-export`; runs no `git switch` and writes nothing on `feature/payments`; after the no it stops: no plan, no board update.
+- [ ] F: resumes without a new plan or branch; asks the developer to switch to `ai/ACME-32-filters` instead of offering `git switch`; runs none; after the no it stops: no code change, no board update.

@@ -117,7 +117,8 @@ No browser, dev server or login. For each ticket, after steps 2.1–2.4:
 4. **Record** one line per criterion and per "How to verify" step: `criterion — pass | fail |
    blocked — <path:line, or the check's output>`. Pass needs code evidence and no failing check
    other than a pre-existing one. A step that needs a live session, a manual run or a command
-   from the comment is **blocked**, never pass; it does not fail the ticket. A criterion only a live run can prove is blocked.
+   from the comment is **blocked**, never pass; it does not fail the ticket. When the project's
+   chain already ran that command (step 1), the blocked line points to that check's line. A criterion only a live run can prove is blocked.
 
 Nothing to attach (§5): the evidence is the path:line lines. Then the verdict (§6), in this
 order: **Fail** when a check fails (not pre-existing) or a criterion fails, the failing checks

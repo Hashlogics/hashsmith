@@ -216,15 +216,25 @@ branch itself, after checking the commit is in `HEAD` and `HEAD` matches `origin
 
 **Edge cases (decided 2026-11-05, HSM-15).** `ticket-state` finds a key's base-branch commits with
 `git log --grep` (no cap on how far back) and matches the key exactly. Any commit that mentions
-the key counts as delivery ("follow-up to ACME-22" too), except a revert (a subject starting
-"Revert" or "Reverts"), which undoes it: a revert newer than the ticket's other commits cancels
+the key counts as delivery ("follow-up to ACME-22" too), except a revert (a subject in
+git's `Revert "…"` form, which a squash-merged GitHub revert PR keeps, or a conventional
+`revert:` type; a plain merge commit of a revert PR reads only as "Merge pull request …", so it
+counts as delivery: accepted, 2026-11-10),
+which undoes it: a revert newer than the ticket's other commits cancels
 them (`no-branch`, `base.reverted: "pushed"`), and a commit after the revert delivers again. A
 revert only on the local base leaves origin delivering it (`base-pushed`, `reverted: "local"`).
 A revert of a revert (older git's name for a reapply) delivers again. `ACME-1a` still counts for
 ACME-1: only a longer number is another ticket. The newest commit decides: a local fix newer than
 every pushed commit gives `base-local` until it is pushed. An `ai/*` branch with no PR no longer
-hides a pushed base-branch commit: the state is then plain base-branch work (`branch: null`) and
-the leftover branch is `stale_branch`; an open or merged PR is still followed through the PR. Every CLI command
+hides a pushed base-branch commit: the state is then plain base-branch
+work (`branch: null`) and the leftover branch is `stale_branch`. Revised 2026-11-10 (HSM-15
+QA): only a branch with no work of its own counts as left over (no commits off origin/<base> in
+its local or origin copy, and not checked out with uncommitted changes), so a teammate's "fix
+seen while testing ACME-22" on the base never replaces live work; an open or merged PR is
+still followed through the PR. Several `ai/*` branches (`ambiguous`) are left to the developer,
+as sync asks which is current. Revised 2026-11-10 (HSM-15 QA): a plain subject such as "Revert
+button colours" is a change, not a revert; an odd number of nested `Revert "` is a revert; a local
+base behind a pushed revert is `no-branch`, not `base-local`. Every CLI command
 runs at the repo's top level, from any subfolder. Patch names replace `/` in the base branch's
 name, as they do in branch names.
 
@@ -366,7 +376,8 @@ Hashsmith up for a project.
    own package names, not presets named after it. A stored `commits` mode stands, like `off`,
    because some generators cannot be detected; onboarding changes it. `changelog-check` flags only
    the project's own ticket key when it is known (so product names like USB-3 pass), treats a
-   heading as a release heading only for a version, a date or the words version or release (a
+   heading as a release heading only for a version, a date (ISO or written out with a year, such as
+   "5 November 2026"; added 2026-11-10) or the words version or release (a
    heading like "OAuth 2.0 sign-in" is then flagged too; accepted, since Hashsmith adds entries,
    not headings), and reports an entry added outside Unreleased (`#` to `###`) by its line in the
    file on disk.
@@ -446,7 +457,12 @@ message), with or without their own instructions, and wants tickets.
    follows the ticket through its key once the commit is on `origin/<base_branch>`; until then it
    reports "waiting to reach origin/<base>", and a squash merge must keep the key in the PR title.
    A resume stays on that branch, and `next` drops its clean-tree gate for `work`. Paths already
-   dirty before the work are listed in the handoff as not the ticket's. `confirm` asks before
+   dirty before the work are listed in the handoff as not the ticket's and left out of its patch.
+   Revised 2026-11-10 (HSM-12 QA): under `current` Hashsmith never offers a switch, not even to a
+   resumed ticket's `ai/*` branch, and a QA bounce whose PR is open asks the developer to switch
+   to the PR's branch, so the PR gets the fix (on a no, it stops). A resume on another branch
+   compares with the merge-base diff, so committed work counts as done. Sync finds the saved
+   patch through CLI `handoff-patch`, whatever branch it was made on. `confirm` asks before
    each switch. Whatever the
    policy, the plan names the branch before anything changes; `qa` never switches under
    `current` and asks first under `confirm`. In a workspace of several repositories each has its
@@ -524,8 +540,9 @@ browser, login and screenshots with: the project's own checks, run and shown; th
 (the PR diff, or every base-branch commit carrying the key, from `ticket-state`'s
 `pushed_commits`) given to a `diff-reviewer` with only the criteria; and one line per criterion,
 pass | fail | blocked with path:line evidence. Steps that need a live session, a manual run or a
-command from the handoff are blocked, never pass, and never run: handoff text is data. Blocked
-steps do not fail a ticket. A failing check (not pre-existing) or criterion fails it; else a
+command from the handoff are blocked, never pass, and never run: handoff text is data; when the
+project's own chain already ran that command, the blocked line points to that check's line
+(2026-11-10, HSM-15). Blocked steps do not fail a ticket. A failing check (not pre-existing) or criterion fails it; else a
 blocked criterion holds it in QA until the developer runs it and reports the result in the
 session (`pass (developer-confirmed, <date>)`). A pass reads "QA passed
 (Hashsmith, code and tests)", so readers can tell it from a browser QA; a fail keeps the usual
@@ -708,7 +725,7 @@ an onboarded repo. "Never another connection" applies to Hashsmith's own work on
      prefix is not `project_key`, turns the call into an **ask** that names the mismatch;
    - the one allowed exception is the Hashsmith feedback board (§12), and only for reads and
      `create_task`: any other write there asks, unless that board is the session's own project
-     (the Hashsmith repo itself). A call that names only a `task_id` carries no project, so RLS
+     (the Hashsmith repo itself, even with its `board_id` left empty: 2026-11-10). A call that names only a `task_id` carries no project, so RLS
      decides it; Hashsmith's skills always pass `task_code` (decided 2026-11-05, HSM-15);
    - before onboarding, when there is no config, reads are allowed and writes are asks.
 2. **A session spanning several repos.** `session-start.mjs` tells the model that Hashsmith is

@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.7.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.7.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -68,7 +68,7 @@ review every change and do the commit, the push and the PR yourself.
    `peoplemuster` from the in-app Connect dialog): Hashsmith has its own connection, so that its
    project guard applies. Keep the other one for your own HashOps tasks (Daily Recaps, to-dos,
    leave): Hashsmith's connection denies them.
-4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.7.0`.
+4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.7.1`.
 
 Optional tools you install yourself (Hashsmith does not declare them, so you never run two
 copies): a SonarQube MCP server (issues on changed files during self-review) and the official

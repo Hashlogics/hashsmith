@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.7.1 — 2026-11-10
+
+- Board tracking fixes: work reverted on origin no longer shows as "not pushed yet", and a
+  teammate's commit that only mentions a ticket no longer pulls an unfinished one into QA.
+- Under the `current` branch policy, Hashsmith never offers a branch switch, keeps a QA bounce
+  on its open PR's branch, and leaves your own uncommitted files out of its handoff.
+
 ## 0.7.0 — 2026-11-05
 
 - Logging time, a to-do or leave from a Hashsmith session: Hashsmith's own HashOps connection

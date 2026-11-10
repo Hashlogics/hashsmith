@@ -65,7 +65,7 @@ export function evaluate(event, { seenFile = SEEN } = {}) {
       ? `This project is onboarded: hashsmith.json at ${root} (HashOps project ${key ?? config.hashops.project_id}). For Hashsmith's work use only the HashOps tools named mcp__plugin_hashsmith_hashops__*, never another connection to the same server (for example one named "peoplemuster"). The developer's own HashOps tasks (Daily Recaps, to-dos, leave) are not Hashsmith's work: its connection denies them, and the developer does them in the HashOps app or through their own connection, which asks before each write.`
       : `This project is not onboarded yet (no HashOps project in ${join(root, "hashsmith.json")}). When the developer wants Hashsmith work, propose /hashsmith:onboard-project first (/hashsmith:feedback works without it). Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
   );
-  parts.push(`Hashsmith CLI: node "${CLI}" <command> (repo-slug, project-candidates, lists-before-todo, repo-match, env-keys, git-switch, check-config, tree, ticket-state, feedback-target, changelog, changelog-check). Run it from the repo root; it prints one JSON line.`);
+  parts.push(`Hashsmith CLI: node "${CLI}" <command> (repo-slug, project-candidates, lists-before-todo, repo-match, env-keys, git-switch, check-config, tree, ticket-state, handoff-patch, feedback-target, changelog, changelog-check). Run it from the repo root; it prints one JSON line.`);
 
   let seen = null;
   try {

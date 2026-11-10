@@ -61,10 +61,14 @@ export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) 
     mismatches.push(`task ${String(input.task_code).trim()} is not on this project (${ownKey}-…)`);
   // The feedback board's exception is for filing a report: create_task and reads. Any other write
   // there (moving, editing or commenting on someone's report) asks, unless it is this project's own.
+  // A project whose own project is the feedback one (the Hashsmith repo) is never "on" it, even
+  // with its board_id left empty.
+  const ownIsFeedback = !!feedback.project_id && h.project_id === feedback.project_id;
   const onFeedback =
-    (!!feedback.project_id && input.project_id === feedback.project_id && input.project_id !== h.project_id) ||
-    (!!feedback.board_id && input.board_id === feedback.board_id && input.board_id !== h.board_id) ||
-    (!!key && !!fbKey && key === fbKey && key !== ownKey);
+    !ownIsFeedback &&
+    ((!!feedback.project_id && input.project_id === feedback.project_id) ||
+      (!!feedback.board_id && input.board_id === feedback.board_id && input.board_id !== h.board_id) ||
+      (!!key && !!fbKey && key === fbKey && key !== ownKey));
   if (onFeedback && !isRead(tool) && tool !== "create_task")
     mismatches.push("it is a write on the Hashsmith feedback board, where only filing a report (create_task) goes through");
 

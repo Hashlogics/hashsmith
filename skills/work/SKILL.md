@@ -34,9 +34,10 @@ and every `branches[].branch`.
   nothing is: no new plan, no new branch, no board update.
 - **Not on one of them:** never plan it again or cut a second branch. With a clean tree, offer
   `git switch <branch>` to its branch (ask which when there are several), then resume as above.
+  Under `current`, never offer it: ask the developer to switch, then resume; on a no, stop.
 - **No `ai/*` branch, and the plan names another branch** (`current`, or `confirm` after a no):
-  never switch. On that branch, resume as above but compare the plan with `git diff HEAD` plus
-  the untracked files; on any other branch, ask the developer to switch to it.
+  never switch. On that branch, resume as above (on the base branch, the commits `ticket-state`
+  lists under `base` count as done too); on any other branch, ask the developer to switch to it.
 
 ## 2. Plan (the execution plan)
 
@@ -76,8 +77,11 @@ Read `repo.branch_policy` (empty or missing: `managed`). Whatever the policy, th
 I will:" names the branch the work goes on.
 - **`current`:** never switch. The work goes on `tree.branch`, whatever it is, and the tree may
   hold the developer's other changes (their call): note `tree.files` now, so the handoff lists
-  them under "Left for the developer" as not this ticket's. Skip steps 1–2. Say once that sync follows the
-  ticket through its key in the commit message: it reaches QA when that commit is on
+  them under "Left for the developer" as not this ticket's. Skip step 1; in step 2 only fetch and
+  run `ticket-state`: a QA bounce whose PR is still open belongs on that PR's branch, so when
+  `tree.branch` is not it, ask the developer to switch to it (on a no, stop: never work it on
+  another branch), and once on it, compare it with `origin/<branch>` as step 2 does. Otherwise say once that sync follows
+  the ticket through its key in the commit message: it reaches QA when that commit is on
   `origin/<base_branch>`.
 - **`managed`** (today's rules) and **`confirm`:** steps 1–2. Under `confirm`, ask before each
   `git switch`, naming the branch and what it is cut from; on a no, ask which branch to use, or
@@ -157,7 +161,11 @@ remain, **three rounds at most**; after the third, hand off red with what is sti
    `git diff $(git merge-base HEAD origin/<base_branch>) > "$P"` (also catches anything the
    developer staged; on another branch, `git diff HEAD > "$P"`, since that branch may carry other
    work), then for each file from `git ls-files --others --exclude-standard`:
-   `git diff --no-index /dev/null <file> >> "$P"` (exit code 1 is normal there).
+   `git diff --no-index /dev/null <file> >> "$P"` (exit code 1 is normal there). Files noted in §3
+   as the developer's stay out: take the paths from `--name-only` of that same diff command, end
+   the command with `-- '<path>' …` naming the others, each quoted (none: skip it), and skip the
+   noted ones among the untracked (a noted folder covers what is inside it); one this ticket
+   changed too goes in, and the handoff says so.
 2. Write the handoff, following `reference/handoff-template.md`: what changed, how to verify (one
    step per criterion; `qa` runs these), screenshots for UI, the verification report, what is left
    for the developer, a draft PR description, the commit message (every ticket key in its

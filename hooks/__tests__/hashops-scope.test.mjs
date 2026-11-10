@@ -51,6 +51,12 @@ describe("hashops-scope", () => {
     const own = { hashops: { project_id: FB_P, board_id: FB_B, project_key: "HSM" } };
     assert.equal(decision("move_task", { task_code: "HSM-4", list_id: "x" }, own), null);
     assert.equal(decision("comment_on_task", { task_code: "HSM-4", content: "x" }, own), null);
+    // Its board id may be left empty ("look it up"): the project is still its own.
+    const ownNoBoard = { hashops: { project_id: FB_P, board_id: "", project_key: "HSM" } };
+    assert.equal(decision("create_board_list", { board_id: FB_B, name: "x" }, ownNoBoard), null);
+    assert.equal(decision("move_task", { task_code: "HSM-4", list_id: "x" }, ownNoBoard), null);
+    // Any other project with an empty board id still asks on a feedback-board write.
+    assert.equal(decision("create_board_list", { board_id: FB_B, name: "x" }, { hashops: { project_id: P, board_id: "", project_key: "HOPS" } }), "ask");
   });
 
   it("before onboarding, lets reads through and asks on writes", () => {
