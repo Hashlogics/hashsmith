@@ -52,6 +52,16 @@ function checkDoc(path, name, { maxLines }) {
 
 describe("skills and agents", () => {
   it("ships at least one skill", () => assert.ok(skillDirs.length > 0, "no skills/*/SKILL.md yet"));
+  it("every git command a reference file names gets past git-guard too", () => {
+    for (const f of readdirSync(join(root, "reference")).filter(f => f.endsWith(".md"))) {
+      const text = readFileSync(join(root, "reference", f), "utf8");
+      for (const [, cmd] of text.matchAll(/`(git [^`]+)`/g)) {
+        const tokens = cmd.split(/\s+/).filter(t => !/^[>|]/.test(t) && t !== "…");
+        if (tokens.includes("switch") || tokens.includes("*")) continue;
+        assert.equal(judge(tokens), "allow", `reference/${f}: \`${cmd}\` is denied by git-guard`);
+      }
+    }
+  });
   for (const dir of skillDirs)
     it(`skills/${dir}/SKILL.md follows the rules`, () => {
       checkDoc(join(root, "skills", dir, "SKILL.md"), dir, { maxLines: 250 });

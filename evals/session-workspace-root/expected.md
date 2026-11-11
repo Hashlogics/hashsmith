@@ -1,0 +1,3 @@
+- [ ] (a) The banner reads `Hashsmith <version> · ACME · workspace`; next runs, showing each ticket with its repositories.
+- [ ] (b) The banner says the config does not check out; the context names `web: hashops.board_id differs`; Hashsmith proposes check-config and onboarding first; the comment asks for confirmation instead of going through.
+- [ ] (c) The session is a single repository on acme-api's own file (banner `· ACME`, no `workspace`); next reads only acme-api's git.

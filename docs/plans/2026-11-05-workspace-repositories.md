@@ -1,11 +1,8 @@
 # Workspace mode: one product, several repositories, one session — Plan
 
-**Status:** approved 2026-11-11 (HSM-18, the deferred half of HSM-11), with each repository keeping
-its own `hashsmith.json` (below). Slice 1 (the CLI) is built; slices 2–5 are follow-up tickets.
-Until slice 2 ships, a workspace session stays inactive and the per-repository workflow of 0.7.0
-(README "One product, several repositories"; design §10 item 2) is the supported way. The scope
-hook already fell back to the session folder's `hashsmith.json` when there is no `.git`, so slice
-1 makes it ignore a file with `repositories` (writes ask, as before onboarding) until slice 2.
+**Status:** built in 0.8.0 (2026-11-11). Approved with HSM-18, the deferred half of HSM-11, with
+each repository keeping its own `hashsmith.json` (below). Slice 1 (the CLI) shipped with HSM-18;
+slices 2–5 with HSM-19 to HSM-22. The evals are written; running them live is open (CLAUDE.md).
 
 **Goal:** a developer starts Claude Code in a folder that holds several Git repositories of one
 product (one HashOps project and board) and uses every `/hashsmith:*` skill from there. Opening
@@ -76,30 +73,35 @@ block once:
   that repository, on its own `hashsmith.json`. The name is a `repositories` key copied from the
   workspace file after `repo-match`, never tag text and never a raw path; it resolves only when
   the key exists and its path is a Git repository inside the workspace.
-- Without `--repo`, only `check-config`, `repo-match`, `lists-before-todo` and `feedback-target`
-  run at the root; every other command fails with the repository names.
-- `--repo` anywhere but a workspace root fails. The CLI never walks up to find a workspace file.
+- Without `--repo`, only `check-config`, `repo-match`, `lists-before-todo`, `feedback-target` and
+  `git-switch` (the root's own settings, which a session there runs under) run at the root; every
+  other command fails with the repository names.
+- `--repo` elsewhere fails, except in a plain folder of repositories before onboarding (no
+  `hashsmith.json`, not inside a repository), where it names a direct child repository. The CLI
+  never walks up to find a workspace file.
 
-### Guard hooks (slice 2, the risky part)
+### Guard hooks (slice 2, the risky part; built)
 
 - session-start and the scope hook use a workspace file only when the session root **is** the
   workspace root (the folder holding a `hashsmith.json` with `repositories`) or one of its listed
   repositories. No walking up past the session root: a workspace file in some parent folder
   never makes an unrelated repository under it count as onboarded.
-- At the root, the scope hook checks HashOps calls against the workspace's `hashops` block
-  (until then it treats a workspace file as no config); a repository whose own block disagrees
-  makes every write ask (hooks never run `check-config`).
+- At the root, the scope hook checks HashOps calls against the workspace's `hashops` block; a
+  repository that is missing, outside the root or whose own block disagrees makes every write
+  ask (hooks never run `check-config`; `workspaceProblems` in `hooks/lib.mjs` checks what they
+  rely on). A workspace file found at a repository's top is never trusted.
 - git-guard and env-guard do not change: they judge every command the same in any repository.
 - Tests: session-start and the scope hook get workspace fixtures (the root, a listed child, an
   unlisted repository under the root, a parent folder above the root, a symlinked child, a child
   whose own config disagrees).
 
-### Skills (slices 3 and 4)
+### Skills (slices 3 and 4; built, in `reference/workspace.md`)
 
-- `onboard-project`: from a workspace root, list the child repositories, let the developer pick
-  which to onboard, settle the shared `hashops` block once, onboard each picked repository's own
-  `hashsmith.json` (as from its own folder), then write the workspace file and run
-  `check-config` at the root.
+- `onboard-project`: from a folder of repositories, let the developer pick which to onboard,
+  settle the shared `hashops` block once, onboard each picked repository's own `hashsmith.json`
+  (as from its own folder), then write every file after one yes and run `check-config` at the
+  root. Before the root file exists, the CLI's `--repo <folder>` reaches a direct child
+  repository (a plain folder only: no `hashsmith.json`, not inside a repository).
 - `next`: shows each ticket with its repositories.
 - `work`: per repository a branch, a patch, a verification run and a handoff; one Plan comment
   that lists the parts. Handoff patches are saved per project key and branch name today, so two
@@ -112,8 +114,10 @@ block once:
 1. CLI: workspace config shape, `check-config`, `--repo` routing, workspace `repo-match` (tests
    first), and the scope hook ignoring a workspace file meanwhile. **Done in HSM-18.**
 2. session-start and the scope hook: workspace config discovery, limited to the root and its
-   listed paths, with fixtures. Its own release. (HSM-19)
+   listed paths, with fixtures. (HSM-19; shipped with slices 3–5 in 0.8.0, at the developer's
+   request to complete the module in one batch.)
 3. Onboarding a workspace. (HSM-20)
 4. `next`, `work`, `sync`, `qa` across repositories, including per-repository handoff patches.
    (HSM-21)
-5. Evals for each, run live before the release. (HSM-22)
+5. Evals for each, run live before the release. (HSM-22; written for 0.8.0, live runs still
+   open: they need a scratch workspace on a scratch HashOps project.)

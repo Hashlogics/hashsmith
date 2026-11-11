@@ -13,7 +13,7 @@ against its code and tests instead (§4b).
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools; the browser is the
 `mcp__plugin_hashsmith_playwright__*` tools. "The CLI" is the `Hashsmith CLI` line in your session
 context. Read `hashops.*`, `qa.base_url` and `qa.mode` from `hashsmith.json` (`check-config`
-first).
+first). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Preconditions
 

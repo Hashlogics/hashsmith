@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.7.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.8.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -68,7 +68,7 @@ review every change and do the commit, the push and the PR yourself.
    `peoplemuster` from the in-app Connect dialog): Hashsmith has its own connection, so that its
    project guard applies. Keep the other one for your own HashOps tasks (Daily Recaps, to-dos,
    leave): Hashsmith's connection denies them.
-4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.7.1`.
+4. **Restart Claude Code.** The first line of a new session says `Hashsmith 0.8.0`.
 
 Optional tools you install yourself (Hashsmith does not declare them, so you never run two
 copies): a SonarQube MCP server (issues on changed files during self-review) and the official
@@ -77,8 +77,9 @@ says so.
 
 ## Set up a project (once per project)
 
-1. Start Claude Code **inside the project's own folder**, not in a folder holding several
-   projects (Hashsmith stays inactive there):
+1. Start Claude Code **inside the project's own folder**. A folder holding several repositories
+   offers to onboard them as one workspace (for one product only: see "One product, several
+   repositories" below); in any other folder that is not a repository, Hashsmith is inactive:
    ```
    cd ~/Sites/hashlogics/<project>
    claude
@@ -99,19 +100,26 @@ you when that is needed.
 ### One product, several repositories
 
 When one product (one HashOps project and board) has its code in several repositories, for
-example a backend, a frontend and a mobile app under one folder, Hashsmith works one repository
-per session:
-1. Onboard each repository from its own folder, choosing the same project and board each time.
-   Each gets its own `hashsmith.json`, with its own base branch, branch policy and QA settings.
-2. Tag each ticket with the repository it belongs to: `repo:<folder name>` (create the tags once
-   in HashOps). A ticket that needs several gets one tag per repository.
-3. Run `/hashsmith:work` from the repository's own session. A ticket tagged only for another
-   repository gets a concern naming it; one tagged for several is planned for this repository's
-   part only, and each part gets its own branch, handoff and PR from its own session.
+example a backend, a frontend and a mobile app under one folder, you can work from that folder
+as one **workspace**, or one repository per session. Either way, tag each ticket with the
+repository it belongs to, `repo:<folder name>` (create the tags once in HashOps); a ticket that
+needs several gets one tag per repository.
 
-Starting Claude Code in the parent folder keeps Hashsmith inactive, and onboarding there lists
-the repositories and points here. A single workspace session is planned
-(`docs/plans/2026-11-05-workspace-repositories.md`).
+**One workspace session.** Start Claude Code in the parent folder and run
+`/hashsmith:onboard-project`. Pick the repositories; Hashsmith settles the project and board once,
+gives each repository its own `hashsmith.json` (its own base branch, branch policy and QA settings)
+and writes a small `hashsmith.json` in the parent folder that lists them. Commit each repository's
+file in that repository; the parent folder's file is outside every repository, so keep a copy where
+the team finds it. Claude Code applies the parent folder's `.claude/settings.json` there, not each
+repository's: copy the rules you need into it. In a new session there, every command works across
+the repositories: `work` gives a ticket one branch, check run, patch and PR per repository, `sync`
+moves it to QA once every part is delivered, and `qa` passes it once every part passes. A ticket
+with no `repo:` tag makes Hashsmith ask which repositories it needs.
+
+**One repository per session.** Onboard each repository from its own folder, choosing the same
+project and board. Run `/hashsmith:work` from the repository's own session: a ticket tagged only
+for another repository gets a concern naming it, and one tagged for several is planned for this
+repository's part only. A repository of a workspace opened on its own works this way too.
 
 ## Use it every day
 

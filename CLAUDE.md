@@ -135,12 +135,10 @@ Keep this list current: add what you defer, remove what you finish.
   its top under `## Unreleased`; after the hashops pilot, decide whether to switch to one file
   per change. Onboarding hashops will ask the changelog question (its `version-bump.yml` only
   bumps `package.json`); stamping `Unreleased` at release would be a hashops workflow change.
-- [ ] **Workspace mode (HSM-11, HSM-18):** one session over several repositories of one product.
-  The plan (`docs/plans/2026-11-05-workspace-repositories.md`) is approved with per-repository
-  configs plus a root list; slice 1 (CLI `--repo` routing, workspace `check-config` and
-  `repo-match`; the scope hook treats a workspace file as not onboarded) is built but unused by
-  any skill. Slices 2–5 are follow-up tickets: HSM-19 the guard
-  hooks (own release), HSM-20 onboarding, HSM-21 `next`/`work`/`sync`/`qa`, HSM-22 evals. Run the
-  `work-repo-routing` and `onboard-workspace-folder` evals live.
+- [ ] **Workspace mode (HSM-11, HSM-18 to HSM-22, 0.8.0):** built; skills follow
+  `reference/workspace.md`. Run the workspace evals live before calling it done
+  (`onboard-workspace`, `onboard-workspace-folder`, `session-workspace-root`,
+  `work-workspace-two-repos`, `work-workspace-untagged`, `work-repo-routing`,
+  `sync-workspace-partial`, `qa-workspace`) in a scratch workspace on a scratch HashOps project.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

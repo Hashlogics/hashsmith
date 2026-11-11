@@ -16,13 +16,11 @@ connection to the same server. "The CLI" is the `Hashsmith CLI` line in your ses
 
 ## 1. Scope
 
-Run `git rev-parse --show-toplevel`. It must equal the session's working directory. If not, stop:
-Hashsmith works in one repo per session (conduct 9); tell the developer to start Claude Code in the
-repo's own folder. When the session context lists "Git repositories here" (a folder holding
-several), name them and explain the supported way for one product in several repositories
-(README "One product, several repositories"): onboard each repository from its own folder,
-choosing the same project and board, and tag each ticket `repo:<folder name>`. Write nothing and
-call no HashOps tool here.
+**A folder of repositories** (the session context lists "Git repositories here", or says this is
+a workspace root): onboard them as one workspace, following `reference/workspace.md`
+("Onboarding"); the steps below run as it says. Otherwise run `git rev-parse --show-toplevel`. It
+must equal the session's working directory. If not, stop: Hashsmith works in one repo per session
+(conduct 9); tell the developer to start Claude Code in the repo's own folder.
 
 If `hashsmith.json` exists, this run is a **refresh**:
 - Run the CLI's `check-config`. Not ok (bad JSON, merge-conflict markers, a malformed key): show

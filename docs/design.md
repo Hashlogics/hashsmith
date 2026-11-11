@@ -348,7 +348,8 @@ description, fixed checkpoints, and a final step that offers to capture lessons 
 **Use when:** the session starts in a repo with no `hashsmith.json`, or the developer asks to set
 Hashsmith up for a project.
 
-1. Check the session scope: a single git repo at the session root.
+1. Check the session scope: a single git repo at the session root, or a folder holding
+   repositories, which is onboarded as one workspace (`reference/workspace.md`, 0.8.0).
 2. Find the HashOps project. Match the git remote against `list_project_links` repo URLs across
    `list_my_projects`, checking first the projects named like the repo's folder or origin (the
    CLI's `project-candidates`, decided 2026-10-30, HSM-5) and the rest only when none of those
@@ -729,23 +730,28 @@ an onboarded repo. "Never another connection" applies to Hashsmith's own work on
      decides it; Hashsmith's skills always pass `task_code` (decided 2026-11-05, HSM-15);
    - before onboarding, when there is no config, reads are allowed and writes are asks.
 2. **A session spanning several repos.** `session-start.mjs` tells the model that Hashsmith is
-   inactive when the session root is not a single git repo, for example `~/Sites/hashlogics`.
+   inactive when the session root is not a single git repo, a workspace root, or a folder holding
+   repositories (where only onboarding runs, offering to make it a workspace: meant for one
+   product's repositories, not a folder of unrelated projects such as `~/Sites/hashlogics`).
    Conduct rule 9 covers `--add-dir`. **One product in several repositories (decided 2026-11-05,
    HSM-11):** each repository is onboarded on its own, all onto the same project and board, and
    tickets carry a `repo:<name>` tag. The CLI's `repo-match` compares those tags with the
    repository's folder and origin names; the ticket assessment raises a Concern for a ticket
    tagged only for another repository, and a ticket tagged for several is planned for this
    repository's part only. In a parent folder, session-start lists the child repositories (a
-   `.git` folder or file, hidden folders skipped) and lets onboarding only explain this, writing
-   nothing. A single workspace session (one `hashsmith.json` with a
+   `.git` folder or file, hidden folders skipped); since 0.8.0 onboarding there can also onboard
+   them as one workspace (below). A single workspace session (one `hashsmith.json` with a
    `repositories` map, a repository path for the CLI and the guard hooks) changes how every guard
-   finds its config, so it is planned separately in `docs/plans/2026-11-05-workspace-repositories.md`
-   rather than built here. **Approved 2026-11-11 (HSM-18)** with one change: each repository keeps
+   finds its config, so it was planned separately in `docs/plans/2026-11-05-workspace-repositories.md`.
+   **Approved 2026-11-11 (HSM-18)** with one change: each repository keeps
    its own complete `hashsmith.json`, and the workspace root's file holds only the shared
    `hashops` block and a `repositories` map (name → `{path}`); `check-config` at the root fails
-   when a repository's block differs. Built in slices: the CLI's `--repo` routing first (the scope
-   hook meanwhile treats a workspace file as no config, so writes there ask), the guard hooks in a
-   release of their own.
+   when a repository's block differs. **Built in 0.8.0** (HSM-18 to HSM-22): session-start and the
+   scope hook read a workspace file only at the session folder itself (never walking up), and
+   trust it only while every listed repository is inside the root, holds a `.git` and has the
+   same project, key and board; otherwise the session warns and every write asks. Skills follow
+   `reference/workspace.md`: routing by `repo-match`, one part per repository, sync and QA over
+   every part. Conduct rule 9 covers the listed repositories.
 3. **Lessons flowing into the shared plugin.** Feedback reports (§12) are written in general
    terms: no client names, project names, code, ids or data. The developer sees the full text
    before it is filed, and the maintainer reviews it again before anything ships.

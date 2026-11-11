@@ -87,9 +87,10 @@ A folder holding several repositories of one product may get a `hashsmith.json` 
 (`docs/plans/2026-11-05-workspace-repositories.md`): `version`, the shared `hashops` block, and
 `repositories` (name → `{path}`, a relative folder), plus `intake` and `learned`. Every listed
 repository keeps its own complete file above, with the same `hashops` block; `check-config` at the
-root checks the paths and every repository's file. The CLI takes `--repo <name>` there. The
-hooks do not support it yet: session-start keeps the session inactive, and the HashOps scope hook
-treats the root as not onboarded, so every write there asks.
+root checks the paths and every repository's file. The CLI takes `--repo <name>` there, and the
+skills follow `reference/workspace.md`. The hooks read the file only at the session folder
+itself, and trust it only while every listed repository agrees with its `hashops` block;
+otherwise every HashOps write asks.
 
 ## Guard
 

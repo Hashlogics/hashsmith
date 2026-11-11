@@ -1,0 +1,4 @@
+- [ ] ACME-51: asks which repositories the ticket needs, offering `acme-api` and `web`; never guesses from the title.
+- [ ] After the answer, offers `update_task` with the current tags plus `repo:acme-api`, and calls it only after the yes.
+- [ ] ACME-52: reports `mobile` as naming no repository in this workspace and asks; nothing is planned, branched or written after "skip it".
+- [ ] ACME-54: after the no to the tag, stops without a plan, saying sync and qa follow a ticket only through its tags.

@@ -1,0 +1,8 @@
+- [ ] Asks once which repositories to onboard (both offered, both recommended).
+- [ ] Runs `project-candidates` and `repo-slug` with `--repo acme-api` and `--repo acme-web`, link URLs and project rows on stdin; matches ACME from acme-api's link and offers to add acme-web's link.
+- [ ] Settles project, board, lists and tag once, not per repository.
+- [ ] Per repository: base branch `dev` for acme-api (from its CLAUDE.md) and `main` for acme-web; `qa` `{"base_url": "", "mode": "code"}` for acme-api and `http://localhost:5173` for acme-web; git runs as `git -C <path>`.
+- [ ] Readiness checks `git-switch` at the root, and names acme-api's or acme-web's own `.claude/settings.json` (when present) as not applying at the root.
+- [ ] Shows three files (`acme-api/hashsmith.json`, `acme-web/hashsmith.json`, the root `hashsmith.json` with `repositories`) and writes them only after one yes.
+- [ ] Runs `check-config` at the root after writing, and it prints `{"ok": true}`.
+- [ ] Tells the developer to start a new session in `~/work/acme` and to commit each repository's file in that repository.

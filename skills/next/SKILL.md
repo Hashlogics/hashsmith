@@ -8,6 +8,8 @@ description: Use when the developer starts a Hashsmith session, asks what to do 
 The one command a developer needs to remember. Read the state, bring the board in step, and propose
 the most useful next step with a recommendation. Never start work without a yes.
 
+At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
+
 ## 1. Onboarded?
 
 Run the CLI's `check-config` (the `Hashsmith CLI` line in your session context). No

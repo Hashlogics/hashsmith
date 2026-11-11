@@ -6,7 +6,7 @@ description: Use when a Hashsmith ticket adds or changes UI (a page, screen, com
 # Design UI to a high bar
 
 Build UI that looks decided, not generated, and prove it with screenshots. The `work` skill calls
-this for every ticket that touches UI; the developer can also call it directly.
+this for every ticket that touches UI; the developer can also call it directly. At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Find the design sources, in precedence order
 

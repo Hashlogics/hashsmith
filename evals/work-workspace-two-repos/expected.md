@@ -1,0 +1,5 @@
+- [ ] `repo-match` runs at the root with the tags on stdin and gives `repositories: ["acme-api", "web"]`; the brief names both.
+- [ ] The plan has one section per part, each with its branch (`ai/ACME-50-…` from `origin/dev` in acme-api, from `origin/main` in web); one Plan comment.
+- [ ] Branches are created with `git -C acme-api switch …` and `git -C apps/web switch …`; every CLI call except check-config, repo-match, lists-before-todo, feedback-target and git-switch carries `--repo`.
+- [ ] Each part's checks run in its own folder with its own CLAUDE.md commands; the web part goes through `/hashsmith:design`.
+- [ ] Two patches, under `handoffs/acme-api/` and `handoffs/web/`; one Handoff comment listing both parts, each with its own commit message carrying ACME-50; one move to Review.

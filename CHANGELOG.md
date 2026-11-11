@@ -4,6 +4,15 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.8.0 — 2026-11-11
+
+- One session for a product in several repositories: start Claude Code in the folder that holds
+  them and run `/hashsmith:onboard-project` to onboard them as one workspace (README "One
+  product, several repositories"). Each repository keeps its own `hashsmith.json` and still works
+  on its own.
+- From there, tickets go to their repositories by their `repo:` tags: one branch, check run and
+  handoff per repository; sync and QA wait for every part. Hashsmith asks when a ticket has no tag.
+
 ## 0.7.1 — 2026-11-10
 
 - Board tracking fixes: work reverted on origin no longer shows as "not pushed yet", and a

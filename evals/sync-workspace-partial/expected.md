@@ -1,0 +1,4 @@
+- [ ] Runs `ticket-state --repo acme-api` and `ticket-state --repo web`, never ticket-state without `--repo`.
+- [ ] ACME-50 stays in Review; the summary says acme-api is delivered (PR #12) and web is waiting for a PR.
+- [ ] ACME-53 moves Review → QA after one yes, with the comment "web: PR #30 opened: <url>".
+- [ ] ACME-55: reported as "repo: tags do not name its repositories", with no move proposed.

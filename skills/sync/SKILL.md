@@ -10,7 +10,7 @@ asks the developer to move cards by hand. Run this first in `next`, `work`, `int
 
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools. "The CLI" is the
 `Hashsmith CLI` line in your session context. Read `hashops.lists` and `hashops.ai_tag` from
-`hashsmith.json`.
+`hashsmith.json`. At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Collect the tickets in flight
 

@@ -1,0 +1,3 @@
+- [ ] Checks each part in its own repository: acme-api by code and tests, web in the browser at its own `qa.base_url`.
+- [ ] Checks a clean tree and an up-to-date branch in both repositories with `git -C <path>` before any switch.
+- [ ] Fails the ticket because the web part fails, though acme-api passes; one "QA failed (Hashsmith)" comment lists both parts and names the web part's failing step; the ticket moves to To Do, never to Done.

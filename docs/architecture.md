@@ -52,7 +52,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `hooks/feedback-board.json` | The Hashsmith project's own board, its Backlog list and the feedback tags: the one cross-project target the scope hook allows, and where `feedback` files | `hashops-scope.mjs`, the CLI's `feedback-target` |
 | `hooks/hashops-tools.json` | `hashsmith`: the HashOps tools Hashsmith's connection may call (exactly the ones the skills name). `writes`: every HashOps write tool | `hashops-scope.mjs` |
 | `reference/conduct.md` | The behaviour contract injected into every session (≤ 60 lines) | `session-start.mjs` |
-| `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, ticket assessment, handoff, changelog, verification report, feedback, fallback standards | skills, on demand |
+| `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, ticket assessment, handoff, changelog, verification report, feedback, fallback standards, workspace mode (`workspace.md`: what every skill adds at a workspace root) | skills, on demand |
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |
 | `agents/*.md` | Helper agents with restricted tools | skills, via the Agent tool |
 | `scripts/hashsmith.mjs` | The Hashsmith CLI | skills, through Bash |
@@ -91,10 +91,10 @@ and prints at most one JSON decision.
 
 | Hook | Event / matcher | Decision |
 | --- | --- | --- |
-| `session-start.mjs` | SessionStart | Injects `conduct.md`, the onboarding state, the CLI path and the what's-new notes. It is inactive outside a single git repo |
+| `session-start.mjs` | SessionStart | Injects `conduct.md`, the onboarding state, the CLI path and the what's-new notes. At a workspace root (the session folder holds a `hashsmith.json` with `repositories`) it lists the repositories, and warns when one does not agree (`workspaceProblems` in `lib.mjs`); in a folder of repositories with no such file, only onboarding runs; elsewhere outside a git repo it is inactive |
 | `git-guard.mjs` | PreToolUse `Bash` | **An allowlist:** read-only git passes, creating or switching to `ai/*` asks, and everything else is denied |
 | `env-guard.mjs` | PreToolUse `Read\|Grep\|Bash` | Denies `.env*` reads (templates allowed). Asks on deploys, `db push` and operator scripts |
-| `hashops-scope.mjs` | PreToolUse `mcp__.*` | On Hashsmith's server: **denies** any tool outside the allowlist; asks when a `project_id`, `board_id` or task code is not the project's in `hashsmith.json` (the feedback board is exempt). On any other server, in an onboarded repo: asks before a HashOps write tool |
+| `hashops-scope.mjs` | PreToolUse `mcp__.*` | On Hashsmith's server: **denies** any tool outside the allowlist; asks when a `project_id`, `board_id` or task code is not the project's in `hashsmith.json` (the feedback board is exempt). At a workspace root it uses the root's `hashops` block only while every repository agrees, else every write asks. On any other server, in an onboarded repo: asks before a HashOps write tool |
 | `config-guard.mjs` | PreToolUse `Write\|Edit\|MultiEdit` | Blocks secret-shaped content and emails in `hashsmith.json` |
 
 Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
@@ -108,7 +108,9 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 `node scripts/hashsmith.mjs <command>` is run from the repo root and prints one JSON line. At a
 workspace root (a `hashsmith.json` with `repositories`), `--repo <name>` runs any command inside
 that listed repository; without it only `check-config` (the whole workspace), `repo-match`,
-`lists-before-todo` and `feedback-target` run there.
+`lists-before-todo` and `feedback-target` run there. Before onboarding, in a plain folder of
+repositories, `--repo <folder>` names a direct child repository. `handoff-patch --repo` reads that
+repository's own handoff folder.
 
 | Command | Returns | Used by |
 | --- | --- | --- |
@@ -150,10 +152,11 @@ they are read from stdin and never placed on a shell command line.
 | State | Where | Written by |
 | --- | --- | --- |
 | Which HashOps project, board, lists and tag belong to a repo; base branch; local URL; tool keys; processed meetings; learned settings | `hashsmith.json` in the project repo, committed by the developer (shape: `reference/config.md`) | `onboard-project`, `intake` (meetings), lessons (`learned`) |
+| Which repositories make up a workspace, and their shared HashOps block | the workspace root's `hashsmith.json`, outside every repository | `onboard-project` |
 | A ticket's stage | the board list it is in | the skills, via `move_task`, after a yes |
 | What happened to a ticket | its HashOps comments: plan, handoff, QA report | `work`, `qa` |
 | Whether the developer accepted the work | git: the `ai/KEY-12-slug` branch and its PR | the developer; read by `sync` |
-| Saved handoff patches, design and QA screenshots | `~/.hashsmith/projects/<KEY>/` | `work`, `design`, `qa` |
+| Saved handoff patches, design and QA screenshots | `~/.hashsmith/projects/<KEY>/` (in a workspace, patches under `handoffs/<repository>/`) | `work`, `design`, `qa` |
 | Last plugin version this person saw | `~/.hashsmith/last_seen_version` | `session-start.mjs` |
 
 There is no Hashsmith database. The board and git are the source of truth, which is why `sync`

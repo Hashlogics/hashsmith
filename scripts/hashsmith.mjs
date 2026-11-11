@@ -22,13 +22,14 @@
 // At a workspace root (a hashsmith.json with `repositories`, docs/plans/2026-11-05-workspace-repositories.md),
 // `--repo <name>` runs any command inside that listed repository, on its own hashsmith.json. Without it
 // only check-config (the whole workspace), repo-match (a ticket's tags → repository names),
-// lists-before-todo and feedback-target run there; the rest fail and list the names.
+// lists-before-todo, feedback-target and git-switch (the root's own settings) run there; the rest
+// fail and list the names. Before onboarding, in a plain folder, --repo names a child repository.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, isAbsolute, join, sep } from "node:path";
+import { basename, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isMain } from "../hooks/lib.mjs";
+import { isMain, relativeFolder, REPO_NAME } from "../hooks/lib.mjs";
 
 // Hosts whose repos are always owner/repo, so anything after that is a web page within the repo.
 const TWO_SEGMENT = new Set(["github.com", "bitbucket.org"]);
@@ -191,7 +192,6 @@ const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog",
 // A workspace file holds what its repositories share; each repository's own file holds the rest.
 const WORKSPACE_TOP = ["version", "hashops", "repositories", "intake", "learned"];
 const REPO_ONLY = ["repo", "qa", "sonar", "sentry", "changelog"];
-const REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const CHANGELOG_MODES = ["write", "commits", "off"];
 const QA_MODES = ["browser", "code", ""];
 const BRANCH_POLICIES = ["managed", "current", "confirm", ""];
@@ -232,9 +232,8 @@ export function checkConfig(c) {
   return e;
 }
 
-/** A relative folder path that stays inside its parent on paper: no absolute path, no "." or ".."
- *  segment, no empty segment, no backslash. Symlinks are checked on disk (workspaceChild). */
-const relativePath = p => isStr(p) && !p.includes("\\") && !isAbsolute(p) && p.split("/").every(seg => seg && seg !== "." && seg !== "..");
+// A relative folder inside the workspace on paper (hooks/lib.mjs); symlinks are checked on disk.
+const relativePath = relativeFolder;
 
 /** The workspace file's repositories map: name → {path}, nothing else, no path twice. */
 function repositoriesErrors(r) {
@@ -741,6 +740,17 @@ const stdinJson = () => {
   }
 };
 
+/** Before a workspace is onboarded: `--repo <folder>` names a direct child folder (no "/") that is a
+ *  Git repository of its own, inside the folder after following symlinks. */
+const bootstrapRepository = (root, name) => {
+  const child = REPO_NAME.test(name) && !name.includes("/") ? workspaceChild(root, name) : null;
+  if (!child?.inside || !child.git) return { error: `No repository "${name}" here: before onboarding, --repo takes a child folder that is a Git repository of its own.` };
+  return { dir: child.dir };
+};
+
+/** The repository --repo routed this run to, so per-repository files (handoff patches) stay apart. */
+let routedRepo = null;
+
 /** What runs at a workspace root without --repo; everything else needs a repository. */
 const WORKSPACE_COMMANDS = {
   "check-config": (_args, root, c) => {
@@ -899,7 +909,8 @@ const COMMANDS = {
   "handoff-patch": keys => {
     const projectKey = tryJson("hashsmith.json")?.hashops?.project_key;
     if (!isStr(projectKey) || !/^[A-Za-z0-9]+$/.test(projectKey)) return { error: "no hashops.project_key in hashsmith.json" };
-    const dir = join(homedir(), ".hashsmith", "projects", projectKey, "handoffs");
+    // At a workspace root, each repository keeps its patches in its own folder (work, workspace mode).
+    const dir = join(homedir(), ".hashsmith", "projects", projectKey, "handoffs", ...(routedRepo ? [routedRepo] : []));
     let names = [];
     try {
       names = readdirSync(dir).map(name => ({ name, mtimeMs: statSync(join(dir, name)).mtimeMs }));
@@ -953,13 +964,19 @@ function route(cmd, argv) {
   const root = process.cwd();
   const workspace = workspaceAt(root);
   if (flag.repo !== null) {
-    if (!workspace) return { result: { error: "--repo works only at a workspace root (a hashsmith.json with repositories)." } };
-    const target = resolveRepository(root, workspace, flag.repo);
+    let target;
+    if (workspace) target = resolveRepository(root, workspace, flag.repo);
+    // Onboarding a workspace runs the per-repository commands before the root file exists: in a
+    // plain folder (no hashsmith.json, not inside a repository), a direct child repository.
+    else if (tryRead(join(root, "hashsmith.json")) === null && !gitTop(root)) target = bootstrapRepository(root, flag.repo);
+    else return { result: { error: "--repo works only at a workspace root (a hashsmith.json with repositories)." } };
     if (target.error) return { result: target };
-    process.chdir(target.dir); // resolveRepository checked it is a repository's own top folder
+    process.chdir(target.dir); // checked: a repository's own top folder inside the root
+    routedRepo = flag.repo;
   } else if (workspace) {
     if (WORKSPACE_COMMANDS[cmd]) return { result: WORKSPACE_COMMANDS[cmd](flag.args, root, workspace) };
-    if (cmd === "lists-before-todo" || cmd === "feedback-target") return { result: COMMANDS[cmd](flag.args) };
+    // git-switch reads the root's own .claude settings: the ones a session here runs under.
+    if (cmd === "lists-before-todo" || cmd === "feedback-target" || cmd === "git-switch") return { result: COMMANDS[cmd](flag.args) };
     return { result: { error: "This is a workspace root: pass --repo <name>.", repositories: Object.keys(workspace.repositories ?? {}) } };
   }
   return { args: flag.args };

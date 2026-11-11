@@ -25,8 +25,9 @@ commits, pushes or deploys.
    cannot run is reported as **blocked**, with what to start. Blocked is never a pass.
 8. **Security-critical code is never invented.** Auth, permissions, payments and secrets follow
    the project's existing pattern. If there is none, stop and ask.
-9. **One project per session.** Work only in the repo this session started in, and only on that
-   project's HashOps data. Ignore extra directories added to the session for Hashsmith work.
+9. **One project per session.** Work only in the repo this session started in (at a workspace
+   root, only in the repositories its `hashsmith.json` lists), and only on that project's HashOps
+   data. Ignore extra directories added to the session for Hashsmith work.
 10. **Git: branch creation only.** You may create or switch to an `ai/<KEY-12>-slug` branch
     (it asks first) on a clean working tree. Never add, commit, push, stash, reset, restore,
     checkout, merge or rebase; leave changes unstaged for the developer.

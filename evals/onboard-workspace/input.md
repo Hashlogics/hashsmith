@@ -1,0 +1,2 @@
+Fixture: Claude Code started in `~/work/acme` (not a Git repository, no `hashsmith.json`) holding `acme-api/` (origin `git@github.com:acme/acme-api.git`, a `dev` branch, CLAUDE.md naming `dev` as the PR target, no web UI) and `acme-web/` (origin `git@github.com:acme/acme-web.git`, `main`, a Vite app on port 5173). A scratch HashOps project ACME with one active board, its lists, and a `repository` link for acme-api only.
+Developer: /hashsmith:onboard-project, picks both repositories, accepts every recommendation and the final yes.

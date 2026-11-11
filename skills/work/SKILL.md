@@ -12,7 +12,7 @@ developer reviews the unstaged change.
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools. "The CLI" is the
 `Hashsmith CLI` line in your session context. Read `hashops.*`, `repo.base_branch`,
 `repo.branch_policy` and `qa.base_url` from `hashsmith.json` (run the CLI's `check-config` first; invalid or missing →
-propose `/hashsmith:onboard-project` and stop).
+propose `/hashsmith:onboard-project` and stop). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Choose the tickets
 
@@ -66,7 +66,8 @@ For each ticket or group:
 5. Write the plan: the acceptance criteria restated, the files to change with one line each, the
    tests to add, the checks that will prove it, and for UI tickets that `/hashsmith:design` runs.
    A ticket tagged for other repositories too (the assessment's `repo-match`) covers this one's
-   part only; the plan lists the other parts, each done from its own repository's session.
+   part only; the plan lists the other parts, each done from its own repository's session (at a
+   workspace root, every part is done here: `reference/workspace.md`).
    End it with "On yes I will:" and the branch (§3), adding the `ai_tag` tag, the move to In
    Progress and posting this plan. Show it and wait for a yes. A no or an edit changes the plan,
    not the ticket.

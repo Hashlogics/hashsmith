@@ -1085,15 +1085,51 @@ describe("CLI in a workspace", () => {
     assert.equal(r.status, 1, r.raw);
     assert.deepEqual(r.out.errors, ["A workspace root must not be inside a Git repository; it is a plain folder holding them."]);
   });
-  it("lists-before-todo and feedback-target run at the root; --repo in a plain folder fails", () => {
-    const { root } = fixtureWorkspace();
+  it("lists-before-todo, feedback-target and git-switch (the root's own settings) run at the root", () => {
+    const { root, api } = fixtureWorkspace();
+    mkdirSync(join(api, ".claude"));
+    writeFileSync(join(api, ".claude", "settings.json"), JSON.stringify({ permissions: { ask: ["Bash(git switch *)"] } }));
+    assert.deepEqual(run(root, ["git-switch"]).out, { rule: "none" }, "the root's settings, not a repository's");
+    assert.deepEqual(run(root, ["git-switch", "--repo", "acme-api"]).out, { rule: "ask" });
     const lists = [{ id: U(8), name: "Backlog", type: "active" }, { id: U(3), name: "To Do", type: "active" }];
     assert.deepEqual(run(root, ["lists-before-todo"], JSON.stringify(lists)).out, { lists: [{ id: U(8), name: "Backlog" }] });
     assert.equal(run(root, ["feedback-target"]).out.ok, true);
-    const plain = mkdtempSync(join(tmpdir(), "hashsmith-plain-"));
-    const r = run(plain, ["tree", "--repo", "web"]);
-    assert.equal(r.status, 2, r.raw);
-    assert.match(r.out.error, /only at a workspace root/);
+  });
+  it("before onboarding, --repo in a folder of repositories reaches a direct child repository only", () => {
+    const parent = mkdtempSync(join(tmpdir(), "hashsmith-boot-"));
+    const api = fixtureRepo('[remote "origin"]\n\turl = git@github.com:Org/acme-backend.git\n', join(parent, "acme-api"));
+    mkdirSync(join(parent, "apps"));
+    fixtureRepo("", join(parent, "apps", "web"));
+    mkdirSync(join(parent, "notes"));
+    mkdirSync(join(parent, "fake", ".git"), { recursive: true });
+    const ok = run(parent, ["project-candidates", "--repo", "acme-api"], "[]");
+    assert.equal(ok.status, 0, ok.raw);
+    assert.deepEqual(ok.out.probes, ["acmeapi", "acmebackend"]);
+    assert.deepEqual(run(parent, ["tree", "--repo", "acme-api"]).out, { clean: true, files: [], branch: "main" });
+    const outside = fixtureRepo();
+    symlinkSync(outside, join(parent, "escape"));
+    for (const name of ["apps/web", "notes", "fake", "missing", "..", "__proto__", "escape"]) {
+      const r = run(parent, ["tree", "--repo", name]);
+      assert.equal(r.status, 2, `${name} ${r.raw}`);
+      assert.match(r.out.error, /a child folder that is a Git repository of its own/, name);
+    }
+    writeFileSync(join(parent, "hashsmith.json"), JSON.stringify({ version: 1, hashops }));
+    assert.match(run(parent, ["tree", "--repo", "acme-api"]).out.error, /only at a workspace root/, "a non-workspace file there: no bootstrap");
+    const inside = run(api, ["tree", "--repo", "acme-api"]);
+    assert.match(inside.out.error, /only at a workspace root/, "inside a repository: no bootstrap");
+  });
+  it("handoff-patch --repo reads that repository's own handoff folder", () => {
+    const { root } = fixtureWorkspace();
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const base = join(home, ".hashsmith", "projects", "ACME", "handoffs");
+    mkdirSync(join(base, "web"), { recursive: true });
+    writeFileSync(join(base, "web", "main-ACME-1.patch"), "diff\n");
+    writeFileSync(join(base, "main-ACME-2.patch"), "diff\n");
+    const r = spawnSync(process.execPath, [CLI, "handoff-patch", "ACME-1", "ACME-2", "--repo", "web"], { cwd: root, encoding: "utf8", env: { ...process.env, HOME: home } });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out["ACME-1"].path, join(base, "web", "main-ACME-1.patch"));
+    assert.equal(out["ACME-2"], null, "another repository's or a single-repository patch is not this one's");
   });
   it("a repository opened directly keeps working on its own file", () => {
     const { api } = fixtureWorkspace();

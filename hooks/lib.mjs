@@ -2,8 +2,8 @@
 // already requires (22+). Each hook reads the event JSON on stdin and prints at most one JSON
 // object on stdout. Printing nothing means "no opinion": Claude Code's normal permission flow,
 // including the project's own deny rules, decides.
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export async function readEvent() {
@@ -57,6 +57,83 @@ export function readConfig(dir) {
   } catch {
     return null;
   }
+}
+
+const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
+
+/** A repository name in a workspace file: also what the CLI's --repo takes. */
+export const REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+
+/** A relative folder path that stays below its parent on paper: "/"-separated segments, each a
+ *  plain name (letters, digits, ".", "_", "-", not starting with "."), so no absolute path, no "."
+ *  or ".." segment and no text beyond a folder name ever comes out of it. Symlinks are checked on disk. */
+export const relativeFolder = p => typeof p === "string" && !isAbsolute(p) && p.split("/").every(seg => REPO_NAME.test(seg));
+
+/** Whether `dir` holds a Git repository of its own without spawning git: a .git folder with a HEAD,
+ *  or a .git file ("gitdir: …", a worktree or submodule) whose target has one. */
+export function hasOwnGit(dir) {
+  const git = join(dir, ".git");
+  try {
+    if (statSync(git).isDirectory()) return existsSync(join(git, "HEAD"));
+    const target = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(git, "utf8"))?.[1];
+    return !!target && existsSync(join(isAbsolute(target) ? target : join(dir, target), "HEAD"));
+  } catch {
+    return false;
+  }
+}
+
+/** A workspace file (one with `repositories`) in `dir` itself, or null. Never a parent folder's:
+ *  a workspace file above the session folder must not make anything under it count as onboarded. */
+export function readWorkspace(dir) {
+  const c = readConfig(dir);
+  return isObj(c) && "repositories" in c ? c : null;
+}
+
+/** Why a workspace file at `root` cannot be trusted by the guards ([] when it can): every listed
+ *  path is a folder inside the root after following symlinks, holds a .git, and has its own
+ *  hashsmith.json with the workspace's project_id, project_key and board_id. The CLI's
+ *  check-config checks more (for example that the .git is a repository of its own, which needs
+ *  git); the hooks spawn no git and never run it, so they check what they rely on. */
+export function workspaceProblems(root, ws) {
+  const problems = [];
+  const h = isObj(ws?.hashops) ? ws.hashops : {};
+  if (!h.project_id) problems.push("it has no hashops.project_id");
+  const repos = isObj(ws?.repositories) ? Object.entries(ws.repositories) : [];
+  if (!repos.length) return [...problems, "it lists no repositories"];
+  let rootReal;
+  try {
+    rootReal = realpathSync.native(root);
+  } catch {
+    return [...problems, "the workspace folder cannot be read"];
+  }
+  for (const [name, entry] of repos) {
+    const path = entry?.path;
+    if (!REPO_NAME.test(name)) {
+      problems.push("a repository name is not letters, digits, \".\", \"_\" or \"-\"");
+      continue;
+    }
+    if (!relativeFolder(path)) {
+      problems.push(`${name}: its path is not a relative folder`);
+      continue;
+    }
+    let real;
+    try {
+      real = realpathSync.native(join(root, path));
+    } catch {
+      problems.push(`${name}: ${path} not found`);
+      continue;
+    }
+    if (!real.startsWith(rootReal + sep)) problems.push(`${name}: ${path} is outside the workspace`);
+    else if (!hasOwnGit(real)) problems.push(`${name}: ${path} is not a Git repository`);
+    else {
+      const own = readConfig(real);
+      if (!isObj(own?.hashops)) problems.push(`${name}: ${path}/hashsmith.json is missing or unreadable`);
+      else if ("repositories" in own) problems.push(`${name}: ${path}/hashsmith.json is a workspace file`);
+      else for (const k of ["project_id", "project_key", "board_id"]) if (own.hashops[k] !== h[k]) problems.push(`${name}: hashops.${k} differs from the workspace's`);
+    }
+  }
+  return problems;
 }
 
 /**

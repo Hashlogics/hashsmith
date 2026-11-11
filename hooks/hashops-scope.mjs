@@ -8,13 +8,15 @@
 //    Hashsmith feedback board (feedback-board.json) is the one exception, for reads and filing a
 //    report (create_task) only; other writes there ask unless it is the session's own project.
 //    A call naming only a task_id carries no project: RLS decides it. Before onboarding, reads
-//    pass and writes ask. A workspace file (a `repositories` map) counts as not onboarded until
-//    the hooks support workspaces (docs/plans/2026-11-05-workspace-repositories.md, slice 2).
+//    pass and writes ask. At a workspace root (the session folder itself holds a hashsmith.json
+//    with `repositories`), the workspace's hashops block is the project, but only while every
+//    listed repository agrees with it (workspaceProblems); otherwise every write asks. A
+//    workspace file found any other way (at a repository's top) is never trusted.
 // 3. In an onboarded repo, a HashOps write through another connection to the same server (for
 //    example the developer's own "peoplemuster") asks: Hashsmith's guards do not cover it.
 // A call that passes gets no opinion: RLS and the normal permission flow decide.
 import { readFileSync } from "node:fs";
-import { decide, isMain, projectDir, readConfig, repoRoot, run } from "./lib.mjs";
+import { decide, isMain, projectDir, readConfig, readWorkspace, repoRoot, run, workspaceProblems } from "./lib.mjs";
 
 const PREFIX = "mcp__plugin_hashsmith_hashops__";
 const isRead = tool => /^(get|list|search|who)_/.test(tool);
@@ -30,14 +32,30 @@ function feedbackBoard() {
 // Read at load: a missing or broken file makes the hook crash, and run() then asks (fail closed).
 const TOOLS = JSON.parse(readFileSync(new URL("./hashops-tools.json", import.meta.url), "utf8"));
 
-export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) ?? projectDir(event)), feedback = feedbackBoard()) {
+/** Set on a workspace config that scopeConfig read at the session folder: why it cannot be
+ *  trusted ([] when it can). A workspace config without it is never trusted. */
+export const PROBLEMS = Symbol("workspace problems");
+
+/** The config that scopes this session: the repository's, or the session folder's workspace file
+ *  (checked against its repositories). Any other folder outside a repository is not onboarded,
+ *  whatever hashsmith.json it holds: session start keeps Hashsmith off there. */
+export function scopeConfig(dir) {
+  const root = repoRoot(dir);
+  if (root) return readConfig(root);
+  const ws = readWorkspace(dir);
+  return ws ? { ...ws, [PROBLEMS]: workspaceProblems(dir, ws) } : null;
+}
+
+export function evaluate(event, config = scopeConfig(projectDir(event)), feedback = feedbackBoard()) {
   const name = String(event.tool_name ?? "");
   const input = event.tool_input ?? {};
   const workspace = config !== null && typeof config === "object" && "repositories" in config;
-  const h = (workspace ? null : config?.hashops) ?? {};
+  const problems = workspace ? (Array.isArray(config[PROBLEMS]) ? config[PROBLEMS] : ["it is not at the session folder"]) : [];
+  const h = (problems.length ? null : config?.hashops) ?? {};
   if (!name.startsWith(PREFIX)) {
     const m = /^mcp__(.+?)__([a-z_]+)$/.exec(name);
-    if (m && h.project_id && TOOLS.writes.includes(m[2]))
+    // In a workspace, a broken one too: its checks would cover these writes only once it checks out.
+    if (m && (h.project_id || workspace) && TOOLS.writes.includes(m[2]))
       return decide("ask", `\`${m[2]}\` writes to HashOps through "${m[1]}", not Hashsmith's own connection, so Hashsmith's checks do not cover it. Confirm only if you asked for this write yourself.`);
     return null;
   }
@@ -48,7 +66,7 @@ export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) 
   if (!h.project_id) {
     if (isRead(tool)) return null;
     if (workspace)
-      return decide("ask", `\`${tool}\` writes to HashOps from a workspace root, and Hashsmith does not support workspace sessions yet: its checks do not cover this write. Start Claude Code in the repository's own folder, or confirm this one write.`);
+      return decide("ask", `\`${tool}\` writes to HashOps, and this workspace's hashsmith.json does not check out (${problems.slice(0, 3).join("; ")}), so Hashsmith's checks do not cover it. Run the CLI's check-config at the workspace root and fix it, or confirm this one write.`);
     return decide("ask", `\`${tool}\` writes to HashOps, and this project has no HashOps project in hashsmith.json yet. Run /hashsmith:onboard-project first, or confirm this one write.`);
   }
 

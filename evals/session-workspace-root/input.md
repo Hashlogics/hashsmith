@@ -1,0 +1,2 @@
+Fixture: `~/work/acme` onboarded as a workspace (root `hashsmith.json` listing `acme-api` and `web` → `apps/web`, each with its own file on project ACME). Three sessions: (a) Claude Code started in `~/work/acme`; (b) the same after `apps/web/hashsmith.json` is edited to another `board_id`; (c) Claude Code started in `~/work/acme/acme-api`.
+Developer: in each, /hashsmith:next; in (b), also asks Hashsmith to comment on an ACME ticket.
