@@ -105,16 +105,20 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 
 ### The CLI: deterministic answers
 
-`node scripts/hashsmith.mjs <command>` is run from the repo root and prints one JSON line.
+`node scripts/hashsmith.mjs <command>` is run from the repo root and prints one JSON line. At a
+workspace root (a `hashsmith.json` with `repositories`), `--repo <name>` runs any command inside
+that listed repository; without it only `check-config` (the whole workspace), `repo-match`,
+`lists-before-todo` and `feedback-target` run there.
 
 | Command | Returns | Used by |
 | --- | --- | --- |
 | `repo-slug` (JSON array of link URLs on stdin) | `origin`, a slug per URL, and `matches` | `onboard-project` |
 | `project-candidates` (JSON array of `list_my_projects` rows on stdin) | `probes` (the folder and origin repo names) and up to five `candidates` named like them, exact before partial | `onboard-project` |
+| `repo-match` (the ticket's tags on stdin) | its `repo:` names, `match` (this repository, others, or null for none) and `others`; at a workspace root, the `repositories` they name, the `unknown` ones and the `ambiguous` ones (naming several) | `work` (assessment) |
 | `lists-before-todo` (`get_board`'s lists on stdin) | the active lists before To Do in board order (Backlog, Icebox: any name), not mapped in `hashops.lists` | `next` |
 | `env-keys` | `.env.example` key names that the local env files lack (names only, never values) | `onboard-project` |
 | `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
-| `check-config` | `hashsmith.json` errors (exit 1 when invalid) | every skill, first |
+| `check-config` | `hashsmith.json` errors (exit 1 when invalid); at a workspace root, also each listed path and repository file | every skill, first |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
 | `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base, plus `pushed_commits`: every pushed one still delivering, oldest first; `reverted` when a revert cancels them) and `base-pushed` / `base-local`; an `ai/*` branch with no PR and no work of its own gives way to a pushed base commit (`stale_branch`) | `sync`, `next`, `qa` |
 | `handoff-patch KEY…` | per key: the newest saved base- or other-branch patch under `~/.hashsmith/projects/<project_key>/handoffs/` (never an `ai/*` branch's), its `branch` (`/` as `-`) and `current` (made on the checked-out branch), or null | `sync` |

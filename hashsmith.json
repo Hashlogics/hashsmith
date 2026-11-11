@@ -19,5 +19,9 @@
   "changelog": {
     "mode": "off",
     "path": "CHANGELOG.md"
+  },
+  "qa": {
+    "base_url": "",
+    "mode": "code"
   }
 }

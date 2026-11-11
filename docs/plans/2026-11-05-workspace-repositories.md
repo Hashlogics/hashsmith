@@ -1,18 +1,23 @@
 # Workspace mode: one product, several repositories, one session — Plan
 
-**Status:** proposed (2026-11-05, from HSM-11). Not built. 0.7.0 ships the per-repository workflow
-instead (README "One product, several repositories"; design §10 item 2).
+**Status:** approved 2026-11-11 (HSM-18, the deferred half of HSM-11), with each repository keeping
+its own `hashsmith.json` (below). Slice 1 (the CLI) is built; slices 2–5 are follow-up tickets.
+Until slice 2 ships, a workspace session stays inactive and the per-repository workflow of 0.7.0
+(README "One product, several repositories"; design §10 item 2) is the supported way. The scope
+hook already fell back to the session folder's `hashsmith.json` when there is no `.git`, so slice
+1 makes it ignore a file with `repositories` (writes ask, as before onboarding) until slice 2.
 
 **Goal:** a developer starts Claude Code in a folder that holds several Git repositories of one
-product (one HashOps project and board) and uses every `/hashsmith:*` skill from there. Single
-repository onboarding stays the simple default and does not change.
+product (one HashOps project and board) and uses every `/hashsmith:*` skill from there. Opening
+any onboarded repository directly keeps working on that repository's own `hashsmith.json`, and
+single-repository onboarding stays the simple default.
 
-**Why it is a plan, not a change:** session-start (the active/inactive gate) and the HashOps scope
-hook find the config by walking up from the session's directory to the nearest `.git`
-(`repoRoot` and `readConfig` in `hooks/lib.mjs`). In a workspace there is no `.git` at the root.
-Getting that wrong makes an un-onboarded repository count as onboarded, so its HashOps writes stop
-asking. git-guard and env-guard judge each command on its own, whatever the repository, and need
-no change. Guards fail closed, so this needs its own design review (conduct 8) and its own
+**Why it ships in slices:** session-start (the active/inactive gate) and the HashOps scope hook
+find the config by walking up from the session's directory to the nearest `.git` (`repoRoot` and
+`readConfig` in `hooks/lib.mjs`). In a workspace there is no `.git` at the root. Getting that wrong
+makes an un-onboarded repository count as onboarded, so its HashOps writes stop asking. git-guard
+and env-guard judge each command on its own, whatever the repository, and need no change. Guards
+fail closed, so the hook change (slice 2) gets its own design review (conduct 8) and its own
 release.
 
 ## What exists after 0.7.0
@@ -23,69 +28,92 @@ release.
   ticket, and a ticket for several repositories is planned for this one's part only.
 - Onboarding from a parent folder lists the child repositories and writes nothing.
 
-## Proposed design
+## Design
 
-### Config
+### Config (decided 2026-11-11, HSM-18)
 
-A workspace `hashsmith.json` at the workspace root:
+Each repository keeps its **own, complete** `hashsmith.json` (the single-repository shape:
+`hashops`, `repo`, `qa`, `changelog`, …), so a session opened in it works as before. The workspace
+root gets a small `hashsmith.json` of its own that lists the repositories and holds the shared
+block once:
 
 ```jsonc
 {
-  "hashops": { /* the one shared block: project, board, lists, ai_tag */ },
+  "version": 1,
+  "hashops": { /* the shared block: project, board, lists, ai_tag */ },
   "repositories": {
-    "acme-api": { "path": "acme-api", "base_branch": "dev", "branch_policy": "managed", "qa": { "base_url": "http://localhost:54321", "mode": "code" } },
-    "acme-web": { "path": "acme-web", "base_branch": "dev", "qa": { "base_url": "http://localhost:5173" } }
+    "acme-api": { "path": "acme-api" },
+    "acme-web": { "path": "apps/web" }
   }
 }
 ```
 
-- `path` is relative, must resolve (after `realpath`) inside the workspace and hold a `.git`.
-- A child repository may keep its own `hashsmith.json`; the workspace file's `hashops` block must
-  then match it, or `check-config` fails, and the scope hook asks on every write while they
-  disagree (hooks never run `check-config`).
-- `repo` (single repository) and `repositories` are mutually exclusive.
+- `repositories` makes a file a workspace file. Its keys are the names `--repo` takes; each value
+  is `{path}` and nothing else. `path` is relative, has no `.` or `..` segment, and appears once.
+- `repo`, `qa`, `sonar`, `sentry` and `changelog` are rejected in the workspace file: they belong
+  to each repository. `intake` and `learned` may sit at the root (one board, one intake record).
+- `check-config` at the root also checks the disk: the root is not inside a Git repository;
+  every `path` resolves inside the workspace after following symlinks, is the top folder of a Git
+  repository of its own, and names no repository another key names; each repository's own
+  `hashsmith.json` exists, is
+  valid, is not itself a workspace file (no nesting), and has exactly the workspace's
+  `project_id`, `project_key`, `board_id`, `ai_tag` and `lists`.
+- Why not one workspace file holding every repository's settings (the first draft): the ticket
+  asked that each repository stay usable on its own, and two copies of `base_branch` or `qa`
+  would drift. Only the `hashops` block is repeated, and `check-config` fails when it differs.
 
 ### Routing
 
-- A ticket's repositories: its `repo:<name>` tags, matched against the `repositories` keys. No
-  tag, or a name that is not a key: ask the developer, and offer to add the tag (`update_task`,
-  after a yes).
+- A ticket's repositories: `repo-match` at the root maps its `repo:<name>` tags to the
+  `repositories` keys (each key also answers to its folder and origin repo names), lists the
+  tags that match none (`unknown`) and those that match several (`ambiguous`). No tag, an unknown
+  or an ambiguous one: ask the developer, and offer to add the tag (`update_task`, after a yes).
 - Before any change, every skill names the repository and the branch it will use.
 
-### CLI
+### CLI (slice 1, built)
 
-- Every command that reads git or the tree takes `--repo <name>`, resolved through
-  `repositories`. The name on the command line is the `repositories` key copied from
-  `hashsmith.json` after matching the ticket's tags (via `repo-match` on stdin), never the tag
-  text and never a raw path. Without it, in a workspace, the command fails.
-- `ticket-state` and `tree` run once per repository; `sync` merges the results per ticket.
+- At a workspace root, `--repo <name>` (anywhere in the arguments, once) runs any command inside
+  that repository, on its own `hashsmith.json`. The name is a `repositories` key copied from the
+  workspace file after `repo-match`, never tag text and never a raw path; it resolves only when
+  the key exists and its path is a Git repository inside the workspace.
+- Without `--repo`, only `check-config`, `repo-match`, `lists-before-todo` and `feedback-target`
+  run at the root; every other command fails with the repository names.
+- `--repo` anywhere but a workspace root fails. The CLI never walks up to find a workspace file.
 
-### Guard hooks (the risky part)
+### Guard hooks (slice 2, the risky part)
 
-- session-start and the scope hook use a workspace config only when the session root **is** the
-  workspace root (the folder holding that `hashsmith.json` with `repositories`) or one of its
-  listed `path`s. No walking up past the session root: a workspace file in some parent folder
+- session-start and the scope hook use a workspace file only when the session root **is** the
+  workspace root (the folder holding a `hashsmith.json` with `repositories`) or one of its listed
+  repositories. No walking up past the session root: a workspace file in some parent folder
   never makes an unrelated repository under it count as onboarded.
+- At the root, the scope hook checks HashOps calls against the workspace's `hashops` block
+  (until then it treats a workspace file as no config); a repository whose own block disagrees
+  makes every write ask (hooks never run `check-config`).
 - git-guard and env-guard do not change: they judge every command the same in any repository.
 - Tests: session-start and the scope hook get workspace fixtures (the root, a listed child, an
   unlisted repository under the root, a parent folder above the root, a symlinked child, a child
   whose own config disagrees).
 
-### Skills
+### Skills (slices 3 and 4)
 
-- `onboard-project`: from a workspace root, onboard the shared `hashops` block once, then each
-  repository's `repo` values, writing one workspace file.
+- `onboard-project`: from a workspace root, list the child repositories, let the developer pick
+  which to onboard, settle the shared `hashops` block once, onboard each picked repository's own
+  `hashsmith.json` (as from its own folder), then write the workspace file and run
+  `check-config` at the root.
 - `next`: shows each ticket with its repositories.
 - `work`: per repository a branch, a patch, a verification run and a handoff; one Plan comment
-  that lists the parts.
+  that lists the parts. Handoff patches are saved per project key and branch name today, so two
+  repositories' parts of one ticket would share a file: the patch path gains the repository name.
 - `sync`: reads every repository; a ticket moves to QA only when every part is delivered.
 - `qa`: per repository its own QA config; a cross-repository ticket runs every part's stack.
 
-## Follow-up tickets (to file when this plan is approved)
+## Slices
 
-1. CLI: workspace config shape, `check-config`, `--repo` routing (tests first).
+1. CLI: workspace config shape, `check-config`, `--repo` routing, workspace `repo-match` (tests
+   first), and the scope hook ignoring a workspace file meanwhile. **Done in HSM-18.**
 2. session-start and the scope hook: workspace config discovery, limited to the root and its
-   listed paths, with fixtures.
-3. Onboarding a workspace.
-4. `next`, `work`, `sync`, `qa` across repositories.
-5. Evals for each, run live before the release.
+   listed paths, with fixtures. Its own release. (HSM-19)
+3. Onboarding a workspace. (HSM-20)
+4. `next`, `work`, `sync`, `qa` across repositories, including per-repository handoff patches.
+   (HSM-21)
+5. Evals for each, run live before the release. (HSM-22)

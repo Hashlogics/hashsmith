@@ -81,6 +81,16 @@ that project. When the same learned key appears across projects, the maintainer 
 core key in the next release, and Hashsmith migrates it out of `learned` when it reads the
 config (`version` bump).
 
+## Workspace root
+
+A folder holding several repositories of one product may get a `hashsmith.json` of its own
+(`docs/plans/2026-11-05-workspace-repositories.md`): `version`, the shared `hashops` block, and
+`repositories` (name → `{path}`, a relative folder), plus `intake` and `learned`. Every listed
+repository keeps its own complete file above, with the same `hashops` block; `check-config` at the
+root checks the paths and every repository's file. The CLI takes `--repo <name>` there. The
+hooks do not support it yet: session-start keeps the session inactive, and the HashOps scope hook
+treats the root as not onboarded, so every write there asks.
+
 ## Guard
 
 `config-guard.mjs` blocks a write to `hashsmith.json` that contains secret-shaped content: `eyJ…`

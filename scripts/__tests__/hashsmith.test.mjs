@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -281,6 +281,124 @@ describe("checkConfig", () => {
     const c = valid();
     delete c.changelog;
     assert.deepEqual(checkConfig(c), []);
+  });
+});
+
+describe("workspace config", () => {
+  const hashops = () => ({
+    project_id: U(1),
+    project_key: "ACME",
+    board_id: U(2),
+    lists: { todo: U(3), in_progress: U(4), review: U(5), qa: U(6), done: U(7) },
+    ai_tag: "hashsmith",
+  });
+  const workspace = () => ({ version: 1, hashops: hashops(), repositories: { "acme-api": { path: "acme-api" }, web: { path: "apps/web" } } });
+  const child = () => ({ version: 1, hashops: hashops(), repo: { base_branch: "dev" }, qa: { base_url: "", mode: "code" } });
+  const children = () => ({ "acme-api": { inside: true, git: true, config: child() }, web: { inside: true, git: true, config: child() } });
+
+  it("accepts a workspace file: the shared hashops block and the repositories map", () => {
+    assert.deepEqual(checkConfig(workspace()), []);
+    const c = workspace();
+    c.intake = { processed_meetings: [] };
+    c.learned = { qa_note: { value: 1, why: "w", source: "s", added: "2026-11-11" } };
+    assert.deepEqual(checkConfig(c), []);
+  });
+  it("rejects repository settings in the workspace file: they live in each repository's own file", () => {
+    for (const key of ["repo", "qa", "sonar", "sentry", "changelog"]) {
+      const c = workspace();
+      c[key] = {};
+      assert.deepEqual(checkConfig(c), [`${key} belongs in each repository's own hashsmith.json, not the workspace file.`], key);
+    }
+  });
+  it("rejects each malformed repositories entry with exactly one error", () => {
+    for (const mutate of [
+      c => (c.repositories = {}),
+      c => (c.repositories = []),
+      c => (c.repositories["-x"] = { path: "x" }),
+      c => (c.repositories["a b"] = { path: "x" }),
+      c => (c.repositories.x = "x"),
+      c => (c.repositories.x = { path: "x", base_branch: "dev" }),
+      c => (c.repositories.x = { path: "" }),
+      c => (c.repositories.x = { path: "/abs/x" }),
+      c => (c.repositories.x = { path: "../x" }),
+      c => (c.repositories.x = { path: "a/../x" }),
+      c => (c.repositories.x = { path: "." }),
+      c => (c.repositories.x = { path: "x/" }),
+      c => (c.repositories.x = { path: "a\\x" }),
+      c => (c.repositories.x = { path: "apps/web" }),
+    ]) {
+      const c = workspace();
+      mutate(c);
+      assert.equal(checkConfig(c).length, 1, `${String(mutate)} → ${JSON.stringify(checkConfig(c))}`);
+    }
+  });
+  it("passes when every repository is inside, a Git repository, and agrees on hashops", () => {
+    assert.deepEqual(cli.checkWorkspace(workspace(), children()), []);
+  });
+  it("names a path that leaves the workspace, a folder that is no Git repository, and a missing or broken config", () => {
+    const ch = children();
+    ch["acme-api"] = { inside: false, git: true, config: child() };
+    ch.web = { inside: true, git: false, config: null };
+    assert.deepEqual(cli.checkWorkspace(workspace(), ch), [
+      "repositories.acme-api.path must stay inside the workspace (symlinks followed).",
+      "repositories.web: apps/web is not a Git repository.",
+    ]);
+    const missing = children();
+    missing.web.config = null;
+    assert.deepEqual(cli.checkWorkspace(workspace(), missing), ["apps/web/hashsmith.json not found: onboard that repository first."]);
+    const invalid = children();
+    invalid.web.config = { __invalid: true };
+    assert.deepEqual(cli.checkWorkspace(workspace(), invalid), ["apps/web/hashsmith.json is not valid JSON."]);
+  });
+  it("passes on a repository's own config errors, prefixed with its path", () => {
+    const ch = children();
+    ch.web.config.repo.branch_policy = "manual";
+    assert.deepEqual(cli.checkWorkspace(workspace(), ch), ['apps/web/hashsmith.json: repo.branch_policy must be "managed", "current", "confirm" or "" (managed).']);
+  });
+  it("fails when a repository's hashops block disagrees with the workspace's, one line per field", () => {
+    const ch = children();
+    ch.web.config.hashops.board_id = U(9);
+    ch.web.config.hashops.lists.qa = "";
+    ch["acme-api"].config.hashops.ai_tag = "ai";
+    assert.deepEqual(cli.checkWorkspace(workspace(), ch), [
+      "acme-api/hashsmith.json: hashops.ai_tag differs from the workspace's.",
+      "apps/web/hashsmith.json: hashops.board_id differs from the workspace's.",
+      "apps/web/hashsmith.json: hashops.lists.qa differs from the workspace's.",
+    ]);
+  });
+  it("rejects two names for one repository (a symlink, or another spelling on a case-insensitive disk)", () => {
+    const ch = children();
+    ch["acme-api"].dir = "/ws/acme-api";
+    ch.web.dir = "/ws/acme-api";
+    assert.deepEqual(cli.checkWorkspace(workspace(), ch), ["repositories.web.path is the same repository as acme-api's."]);
+  });
+  it("rejects a repository whose own file is a workspace: workspaces do not nest", () => {
+    const ch = children();
+    ch.web.config = workspace();
+    assert.deepEqual(cli.checkWorkspace(workspace(), ch), ["apps/web/hashsmith.json is a workspace file; workspaces do not nest."]);
+  });
+});
+
+describe("workspace routing", () => {
+  const probes = { "acme-api": ["acmeapi", "backend"], web: ["web", "acmeweb"] };
+  it("maps a ticket's repo: tags to the repositories they name, ignoring case and punctuation", () => {
+    assert.deepEqual(cli.workspaceRoute(["ui", "repo:Acme_API"], probes), { repos: ["Acme_API"], repositories: ["acme-api"], unknown: [], ambiguous: [] });
+    assert.deepEqual(cli.workspaceRoute(["repo:acme-web", "repo:backend"], probes), { repos: ["acme-web", "backend"], repositories: ["acme-api", "web"], unknown: [], ambiguous: [] });
+  });
+  it("lists tags that name no repository, and gives none for an untagged ticket", () => {
+    assert.deepEqual(cli.workspaceRoute(["repo:mobile", "repo:web"], probes), { repos: ["mobile", "web"], repositories: ["web"], unknown: ["mobile"], ambiguous: [] });
+    assert.deepEqual(cli.workspaceRoute(["feedback"], probes), { repos: [], repositories: [], unknown: [], ambiguous: [] });
+  });
+  it("flags a tag that names several repositories (one's key is another's folder or origin name)", () => {
+    const overlap = { api: ["api", "acmeapi"], "acme-api": ["acmeapi", "legacy"] };
+    assert.deepEqual(cli.workspaceRoute(["repo:acme-api"], overlap), { repos: ["acme-api"], repositories: ["api", "acme-api"], unknown: [], ambiguous: ["acme-api"] });
+  });
+  it("reads --repo <name> anywhere in the arguments, once", () => {
+    assert.deepEqual(cli.parseRepoFlag(["ACME-1", "--repo", "web", "ACME-2"]), { repo: "web", args: ["ACME-1", "ACME-2"] });
+    assert.deepEqual(cli.parseRepoFlag(["ACME-1"]), { repo: null, args: ["ACME-1"] });
+    assert.match(cli.parseRepoFlag(["--repo"]).error, /--repo needs/);
+    assert.match(cli.parseRepoFlag(["--repo", "--x"]).error, /--repo needs/);
+    assert.match(cli.parseRepoFlag(["--repo", "a", "--repo", "b"]).error, /once/);
   });
 });
 
@@ -825,5 +943,162 @@ describe("CLI", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /usage/i);
+  });
+});
+
+describe("CLI in a workspace", () => {
+  const hashops = { project_id: U(1), project_key: "ACME", board_id: U(2), lists: { todo: U(3), in_progress: U(4), review: U(5), qa: U(6), done: U(7) }, ai_tag: "hashsmith" };
+  // A workspace root (no .git) holding two repositories, each with its own hashsmith.json.
+  function fixtureWorkspace() {
+    const root = mkdtempSync(join(tmpdir(), "hashsmith-ws-"));
+    const api = fixtureRepo('[remote "origin"]\n\turl = git@github.com:Org/acme-backend.git\n', join(root, "acme-api"));
+    mkdirSync(join(root, "apps"));
+    const web = fixtureRepo("", join(root, "apps", "web"));
+    for (const [dir, base] of [[api, "dev"], [web, "main"]])
+      writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repo: { base_branch: base } }));
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { "acme-api": { path: "acme-api" }, web: { path: "apps/web" } } }));
+    return { root, api, web };
+  }
+  const run = (cwd, args, input) => {
+    const r = spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8", input });
+    return { status: r.status, out: r.stdout ? JSON.parse(r.stdout) : null, raw: r.stdout + r.stderr };
+  };
+
+  it("check-config at the root checks the workspace file and every repository's own file", () => {
+    const { root, web } = fixtureWorkspace();
+    const ok = run(root, ["check-config"]);
+    assert.deepEqual(ok.out, { ok: true }, ok.raw);
+    writeFileSync(join(web, "hashsmith.json"), JSON.stringify({ version: 1, hashops: { ...hashops, board_id: U(9) }, repo: { base_branch: "main" } }));
+    const bad = run(root, ["check-config"]);
+    assert.equal(bad.status, 1, bad.raw);
+    assert.deepEqual(bad.out.errors, ["apps/web/hashsmith.json: hashops.board_id differs from the workspace's."]);
+  });
+  it("check-config rejects a listed folder that is not a Git repository, or a symlink out of the workspace", () => {
+    const { root } = fixtureWorkspace();
+    const outside = fixtureRepo();
+    writeFileSync(join(outside, "hashsmith.json"), JSON.stringify({ version: 1, hashops }));
+    symlinkSync(outside, join(root, "escape"));
+    mkdirSync(join(root, "plain"));
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { out: { path: "escape" }, plain: { path: "plain" }, gone: { path: "gone" } } }));
+    const r = run(root, ["check-config"]);
+    assert.equal(r.status, 1, r.raw);
+    assert.deepEqual(r.out.errors, [
+      "repositories.out.path must stay inside the workspace (symlinks followed).",
+      "repositories.plain: plain is not a Git repository.",
+      "repositories.gone: gone is not a Git repository.",
+    ]);
+  });
+  it("--repo runs a command inside that repository, with its own hashsmith.json", () => {
+    const { root } = fixtureWorkspace();
+    const api = run(root, ["ticket-state", "ACME-1", "--repo", "acme-api"]);
+    assert.equal(api.status, 0, api.raw);
+    assert.equal(api.out["ACME-1"].base.branch, "dev");
+    const web = run(root, ["ticket-state", "--repo", "web", "ACME-1"]);
+    assert.equal(web.out["ACME-1"].base.branch, "main", web.raw);
+    const tree = run(root, ["tree", "--repo", "web"]);
+    assert.deepEqual(tree.out, { clean: false, files: ["hashsmith.json"], branch: "main" }, tree.raw);
+    const conf = run(root, ["check-config", "--repo", "acme-api"]);
+    assert.deepEqual(conf.out, { ok: true }, conf.raw);
+  });
+  it("a per-repository command at the root without --repo fails and lists the names", () => {
+    const { root } = fixtureWorkspace();
+    for (const args of [["tree"], ["ticket-state", "ACME-1"], ["changelog"], ["env-keys"], ["handoff-patch", "ACME-1"]]) {
+      const r = run(root, args);
+      assert.equal(r.status, 2, `${args} ${r.raw}`);
+      assert.deepEqual(r.out, { error: "This is a workspace root: pass --repo <name>.", repositories: ["acme-api", "web"] }, String(args));
+    }
+  });
+  it("--repo with an unknown name, a listed path that escapes, or outside a workspace fails", () => {
+    const { root, api } = fixtureWorkspace();
+    for (const name of ["mobile", "__proto__", "constructor", "../acme-api"]) {
+      const r = run(root, ["tree", "--repo", name]);
+      assert.equal(r.status, 2, `${name} ${r.raw}`);
+      assert.deepEqual(r.out, { error: `No repository "${name}" in the workspace's hashsmith.json.`, repositories: ["acme-api", "web"] }, name);
+    }
+    const outside = run(api, ["tree", "--repo", "web"]);
+    assert.equal(outside.status, 2, outside.raw);
+    assert.match(outside.out.error, /only at a workspace root/);
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { up: { path: "../x" } } }));
+    const bad = run(root, ["tree", "--repo", "up"]);
+    assert.equal(bad.status, 2, bad.raw);
+    assert.match(bad.out.error, /check-config/);
+  });
+  it("repo-match at the root maps the tags on stdin to repositories by key, folder and origin names", () => {
+    const { root } = fixtureWorkspace();
+    const task = { result: { tags: ["repo:acme-backend", "repo:Web", "repo:$(touch pwned)"] } };
+    const r = run(root, ["repo-match"], JSON.stringify(task));
+    assert.equal(r.status, 0, r.raw);
+    assert.deepEqual(r.out, { workspace: true, repos: ["acme-backend", "Web", "$(touch pwned)"], repositories: ["acme-api", "web"], unknown: ["$(touch pwned)"], ambiguous: [] });
+    assert.equal(existsSync(join(root, "pwned")), false);
+    const one = run(root, ["repo-match", "--repo", "web"], JSON.stringify(["repo:web"]));
+    assert.deepEqual(one.out, { probes: ["web"], repos: ["web"], match: true, others: [] }, one.raw);
+  });
+  it("--repo follows a symlink that stays inside the workspace, and refuses one that leaves it", () => {
+    const { root, web } = fixtureWorkspace();
+    const outside = fixtureRepo();
+    symlinkSync(outside, join(root, "escape"));
+    symlinkSync(web, join(root, "web-link"));
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { out: { path: "escape" }, link: { path: "web-link" } } }));
+    const out = run(root, ["tree", "--repo", "out"]);
+    assert.equal(out.status, 2, out.raw);
+    assert.match(out.out.error, /not a Git repository inside the workspace/);
+    const link = run(root, ["tree", "--repo", "link"]);
+    assert.equal(link.status, 0, link.raw);
+    assert.equal(link.out.branch, "main");
+    const route = run(root, ["repo-match"], JSON.stringify(["repo:web-link"]));
+    assert.deepEqual(route.out.repositories, ["link"], "a symlinked key answers to its listed folder name");
+  });
+  it("a listed folder with a .git that is no repository of its own never sends git up to an outer one", () => {
+    const { root } = fixtureWorkspace();
+    mkdirSync(join(root, "fake", ".git"), { recursive: true });
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { fake: { path: "fake" } } }));
+    const r = run(root, ["tree", "--repo", "fake"]);
+    assert.equal(r.status, 2, r.raw);
+    assert.deepEqual(run(root, ["check-config"]).out.errors, ["repositories.fake: fake is not a Git repository."]);
+  });
+  it("check-config at the root rejects two names for one repository on disk, and a repository's own workspace file", () => {
+    const { root, web } = fixtureWorkspace();
+    symlinkSync(web, join(root, "web-link"));
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { web: { path: "apps/web" }, link: { path: "web-link" } } }));
+    assert.deepEqual(run(root, ["check-config"]).out.errors, ["repositories.link.path is the same repository as web's."]);
+    writeFileSync(join(web, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { x: { path: "x" } } }));
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { web: { path: "apps/web" } } }));
+    assert.deepEqual(run(root, ["check-config"]).out.errors, ["apps/web/hashsmith.json is a workspace file; workspaces do not nest."]);
+  });
+  it("check-config in a repository, from a subfolder or through --repo, never passes a workspace file", () => {
+    const { root, web } = fixtureWorkspace();
+    writeFileSync(join(web, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { x: { path: "x" } } }));
+    mkdirSync(join(web, "src"));
+    for (const [cwd, args] of [[join(web, "src"), ["check-config"]], [root, ["check-config", "--repo", "web"]]]) {
+      const r = run(cwd, args);
+      assert.equal(r.status, 1, r.raw);
+      assert.match(r.out.errors[0], /workspace file: run check-config at the workspace root/, cwd);
+    }
+  });
+  it("check-config rejects a workspace root that is itself inside a Git repository", () => {
+    const outer = fixtureRepo();
+    mkdirSync(join(outer, "ws"));
+    const api = fixtureRepo("", join(outer, "ws", "acme-api"));
+    writeFileSync(join(api, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repo: { base_branch: "dev" } }));
+    writeFileSync(join(outer, "ws", "hashsmith.json"), JSON.stringify({ version: 1, hashops, repositories: { "acme-api": { path: "acme-api" } } }));
+    const r = run(join(outer, "ws"), ["check-config"]);
+    assert.equal(r.status, 1, r.raw);
+    assert.deepEqual(r.out.errors, ["A workspace root must not be inside a Git repository; it is a plain folder holding them."]);
+  });
+  it("lists-before-todo and feedback-target run at the root; --repo in a plain folder fails", () => {
+    const { root } = fixtureWorkspace();
+    const lists = [{ id: U(8), name: "Backlog", type: "active" }, { id: U(3), name: "To Do", type: "active" }];
+    assert.deepEqual(run(root, ["lists-before-todo"], JSON.stringify(lists)).out, { lists: [{ id: U(8), name: "Backlog" }] });
+    assert.equal(run(root, ["feedback-target"]).out.ok, true);
+    const plain = mkdtempSync(join(tmpdir(), "hashsmith-plain-"));
+    const r = run(plain, ["tree", "--repo", "web"]);
+    assert.equal(r.status, 2, r.raw);
+    assert.match(r.out.error, /only at a workspace root/);
+  });
+  it("a repository opened directly keeps working on its own file", () => {
+    const { api } = fixtureWorkspace();
+    const r = run(api, ["check-config"]);
+    assert.deepEqual(r.out, { ok: true }, r.raw);
+    assert.equal(run(api, ["ticket-state", "ACME-1"]).out["ACME-1"].base.branch, "dev");
   });
 });

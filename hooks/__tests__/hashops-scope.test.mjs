@@ -21,6 +21,17 @@ describe("hashops-scope", () => {
     assert.equal(decision("move_task", { task_id: OTHER, list_id: "x" }), null); // task_id: RLS decides
   });
 
+  it("treats a workspace file as not onboarded until the hooks support workspaces: reads pass, writes ask", () => {
+    const workspace = { ...config, repositories: { "acme-api": { path: "acme-api" } } };
+    assert.equal(decision("list_tasks", { project_id: P }, workspace), null);
+    for (const [tool, input] of [["create_task", { board_id: B, list_id: "x", title: "t" }], ["move_task", { task_code: "HOPS-1", list_id: "x" }], ["comment_on_task", { task_code: "HOPS-1", content: "x" }]]) {
+      const out = call(tool, input, workspace);
+      assert.equal(out?.hookSpecificOutput.permissionDecision, "ask", tool);
+      assert.match(out.hookSpecificOutput.permissionDecisionReason, /workspace/, tool);
+    }
+    assert.equal(evaluate({ tool_name: "mcp__peoplemuster__update_task", tool_input: {} }, workspace, feedback), null, "no onboarded project: no opinion on another connection");
+  });
+
   it("asks, naming the mismatch, when a call reaches another project, board or task", () => {
     assert.equal(decision("list_boards", { project_id: OTHER }), "ask");
     assert.equal(decision("get_board", { board_id: OTHER }), "ask");

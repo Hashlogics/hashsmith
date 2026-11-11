@@ -8,7 +8,8 @@
 //    Hashsmith feedback board (feedback-board.json) is the one exception, for reads and filing a
 //    report (create_task) only; other writes there ask unless it is the session's own project.
 //    A call naming only a task_id carries no project: RLS decides it. Before onboarding, reads
-//    pass and writes ask.
+//    pass and writes ask. A workspace file (a `repositories` map) counts as not onboarded until
+//    the hooks support workspaces (docs/plans/2026-11-05-workspace-repositories.md, slice 2).
 // 3. In an onboarded repo, a HashOps write through another connection to the same server (for
 //    example the developer's own "peoplemuster") asks: Hashsmith's guards do not cover it.
 // A call that passes gets no opinion: RLS and the normal permission flow decide.
@@ -32,7 +33,8 @@ const TOOLS = JSON.parse(readFileSync(new URL("./hashops-tools.json", import.met
 export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) ?? projectDir(event)), feedback = feedbackBoard()) {
   const name = String(event.tool_name ?? "");
   const input = event.tool_input ?? {};
-  const h = config?.hashops ?? {};
+  const workspace = config !== null && typeof config === "object" && "repositories" in config;
+  const h = (workspace ? null : config?.hashops) ?? {};
   if (!name.startsWith(PREFIX)) {
     const m = /^mcp__(.+?)__([a-z_]+)$/.exec(name);
     if (m && h.project_id && TOOLS.writes.includes(m[2]))
@@ -45,6 +47,8 @@ export function evaluate(event, config = readConfig(repoRoot(projectDir(event)) 
 
   if (!h.project_id) {
     if (isRead(tool)) return null;
+    if (workspace)
+      return decide("ask", `\`${tool}\` writes to HashOps from a workspace root, and Hashsmith does not support workspace sessions yet: its checks do not cover this write. Start Claude Code in the repository's own folder, or confirm this one write.`);
     return decide("ask", `\`${tool}\` writes to HashOps, and this project has no HashOps project in hashsmith.json yet. Run /hashsmith:onboard-project first, or confirm this one write.`);
   }
 

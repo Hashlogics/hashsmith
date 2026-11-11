@@ -18,10 +18,15 @@
 //   feedback-target      the Hashsmith feedback board, list and tags, and the plugin version (exit 1 when invalid)
 //   changelog            how this project keeps its changelog: stored in hashsmith.json, else detected (names only)
 //   changelog-check TYPE the commit type's changelog heading, and what the patch on stdin does to the changelog
+//
+// At a workspace root (a hashsmith.json with `repositories`, docs/plans/2026-11-05-workspace-repositories.md),
+// `--repo <name>` runs any command inside that listed repository, on its own hashsmith.json. Without it
+// only check-config (the whole workspace), repo-match (a ticket's tags → repository names),
+// lists-before-todo and feedback-target run there; the rest fail and list the names.
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain } from "../hooks/lib.mjs";
 
@@ -65,11 +70,48 @@ export function repoProbes(dirName, originUrl) {
  *  repositories). match: true when one names this repo, false when they all name others, null
  *  when the ticket names no repository. others: the names that are not this repo. */
 export function repoMatch(tags, probes) {
-  const repos = (Array.isArray(tags) ? tags : [])
-    .map(t => (typeof t === "string" ? /^\s*repo\s*:\s*(\S.*?)\s*$/i.exec(t)?.[1] : null))
-    .filter(Boolean);
+  const repos = repoTags(tags);
   const mine = name => probes.includes(plainName(name));
   return { repos, match: repos.length === 0 ? null : repos.some(mine), others: repos.filter(r => !mine(r)) };
+}
+
+/** The names in a ticket's repo:<name> tags, as written. */
+const repoTags = tags =>
+  (Array.isArray(tags) ? tags : [])
+    .map(t => (typeof t === "string" ? /^\s*repo\s*:\s*(\S.*?)\s*$/i.exec(t)?.[1] : null))
+    .filter(Boolean);
+
+/** A ticket's repo:<name> tags against a workspace's repositories ({name: probes}): the
+ *  repositories they name, in the workspace file's order, the tag names that match none, and those
+ *  that match several (one repository's key is another's folder or origin name: ask). */
+export function workspaceRoute(tags, probes) {
+  const repos = repoTags(tags);
+  const names = Object.keys(probes);
+  const hits = r => names.filter(name => probes[name].includes(plainName(r)));
+  return {
+    repos,
+    repositories: names.filter(name => repos.some(r => hits(r).includes(name))),
+    unknown: repos.filter(r => hits(r).length === 0),
+    ambiguous: repos.filter(r => hits(r).length > 1),
+  };
+}
+
+/** `--repo <name>` anywhere in the arguments, at most once; the rest stay in order. */
+export function parseRepoFlag(args) {
+  const rest = [];
+  let repo = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== "--repo") {
+      rest.push(args[i]);
+      continue;
+    }
+    if (repo !== null) return { error: "Pass --repo once." };
+    const value = args[i + 1];
+    if (value === undefined || value.startsWith("--")) return { error: "--repo needs a repository name from the workspace's hashsmith.json." };
+    repo = value;
+    i++;
+  }
+  return { repo, args: rest };
 }
 
 /** The tags array from stdin: the array itself, or get_task's result around it; null otherwise. */
@@ -146,6 +188,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TICKET = /^[A-Z0-9]+-\d+$/;
 const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "learned"];
+// A workspace file holds what its repositories share; each repository's own file holds the rest.
+const WORKSPACE_TOP = ["version", "hashops", "repositories", "intake", "learned"];
+const REPO_ONLY = ["repo", "qa", "sonar", "sentry", "changelog"];
+const REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const CHANGELOG_MODES = ["write", "commits", "off"];
 const QA_MODES = ["browser", "code", ""];
 const BRANCH_POLICIES = ["managed", "current", "confirm", ""];
@@ -156,8 +202,11 @@ const isStr = v => typeof v === "string";
 /** hashsmith.json shape errors (design §5, reference/config.md); [] means valid. */
 export function checkConfig(c) {
   if (!isObj(c)) return ["hashsmith.json must be a JSON object."];
+  const workspace = "repositories" in c;
   const e = [];
-  for (const k of Object.keys(c)) if (!TOP.includes(k)) e.push(`Unknown top-level key "${k}".`);
+  for (const k of Object.keys(c))
+    if (workspace && REPO_ONLY.includes(k)) e.push(`${k} belongs in each repository's own hashsmith.json, not the workspace file.`);
+    else if (!(workspace ? WORKSPACE_TOP : TOP).includes(k)) e.push(`Unknown top-level key "${k}".`);
   if (c.version !== 1) e.push("version must be 1.");
 
   const h = c.hashops;
@@ -177,6 +226,34 @@ export function checkConfig(c) {
     if (!isStr(h.ai_tag) || !h.ai_tag.trim()) e.push("hashops.ai_tag must be a non-empty string.");
   }
 
+  if (workspace) e.push(...repositoriesErrors(c.repositories));
+  else e.push(...repoSettingsErrors(c));
+  e.push(...sharedErrors(c));
+  return e;
+}
+
+/** A relative folder path that stays inside its parent on paper: no absolute path, no "." or ".."
+ *  segment, no empty segment, no backslash. Symlinks are checked on disk (workspaceChild). */
+const relativePath = p => isStr(p) && !p.includes("\\") && !isAbsolute(p) && p.split("/").every(seg => seg && seg !== "." && seg !== "..");
+
+/** The workspace file's repositories map: name → {path}, nothing else, no path twice. */
+function repositoriesErrors(r) {
+  if (!isObj(r) || !Object.keys(r).length) return ["repositories must be an object of name → {path}, with at least one repository."];
+  const e = [];
+  const seen = new Map();
+  for (const [name, v] of Object.entries(r)) {
+    if (!REPO_NAME.test(name)) e.push(`repositories key "${name}" must be letters, digits, ".", "_" or "-", starting with a letter or digit.`);
+    else if (!isObj(v) || Object.keys(v).some(k => k !== "path")) e.push(`repositories.${name} must be {path}; its settings live in its own hashsmith.json.`);
+    else if (!relativePath(v.path)) e.push(`repositories.${name}.path must be a relative folder inside the workspace, like "acme-api".`);
+    else if (seen.has(v.path)) e.push(`repositories.${name}.path is also ${seen.get(v.path)}'s.`);
+    else seen.set(v.path, name);
+  }
+  return e;
+}
+
+/** The keys only a single repository's file holds. */
+function repoSettingsErrors(c) {
+  const e = [];
   if (c.repo !== undefined && !(isObj(c.repo) && isStr(c.repo.base_branch) && c.repo.base_branch.trim()))
     e.push("repo.base_branch must be a non-empty string.");
   // How work and qa pick a branch (design §6 work): managed ai/* branches, the checked-out one, or ask.
@@ -195,7 +272,12 @@ export function checkConfig(c) {
   const log = c.changelog;
   if (log !== undefined && !(isObj(log) && CHANGELOG_MODES.includes(log.mode) && isStr(log.path) && /^[^/\\]+\.md$/i.test(log.path)))
     e.push('changelog must be {mode: "write" | "commits" | "off", path: a .md file at the repo root}.');
+  return e;
+}
 
+/** The keys both a repository's file and a workspace file may hold. */
+function sharedErrors(c) {
+  const e = [];
   if (c.intake !== undefined) {
     const meetings = c.intake?.processed_meetings;
     if (!isObj(c.intake) || (meetings !== undefined && !Array.isArray(meetings))) e.push("intake.processed_meetings must be an array.");
@@ -220,6 +302,39 @@ export function checkConfig(c) {
         else if (!(isObj(v) && "value" in v && isStr(v.why) && isStr(v.source) && DAY.test(v.added ?? "")))
           e.push(`learned.${k} must be {value, why, source, added: YYYY-MM-DD}.`);
       }
+  }
+  return e;
+}
+
+/** A valid workspace file against what is on disk for each repository (children: name →
+ *  {inside, git, dir, config}): each path stays inside the workspace and holds its own Git
+ *  repository (no two names for one folder) whose hashsmith.json is valid, is not a workspace,
+ *  and has the workspace's hashops block. */
+export function checkWorkspace(c, children) {
+  const e = [];
+  const seen = new Map();
+  for (const [name, { path }] of Object.entries(c.repositories)) {
+    const child = children[name];
+    const file = `${path}/hashsmith.json`;
+    const twin = child?.dir ? seen.get(child.dir) : undefined;
+    if (child?.dir && !twin) seen.set(child.dir, name);
+    if (!child?.inside) e.push(`repositories.${name}.path must stay inside the workspace (symlinks followed).`);
+    else if (twin) e.push(`repositories.${name}.path is the same repository as ${twin}'s.`);
+    else if (!child.git) e.push(`repositories.${name}: ${path} is not a Git repository.`);
+    else if (child.config === null || child.config === undefined) e.push(`${file} not found: onboard that repository first.`);
+    else if (child.config.__invalid) e.push(`${file} is not valid JSON.`);
+    else if (isObj(child.config) && "repositories" in child.config) e.push(`${file} is a workspace file; workspaces do not nest.`);
+    else {
+      const own = checkConfig(child.config);
+      if (own.length) {
+        e.push(...own.map(m => `${file}: ${m}`));
+        continue;
+      }
+      const [mine, shared] = [child.config.hashops, c.hashops];
+      for (const k of ["project_id", "project_key", "board_id", "ai_tag"])
+        if (mine[k] !== shared[k]) e.push(`${file}: hashops.${k} differs from the workspace's.`);
+      for (const k of LISTS) if (mine.lists[k] !== shared.lists[k]) e.push(`${file}: hashops.lists.${k} differs from the workspace's.`);
+    }
   }
   return e;
 }
@@ -565,29 +680,111 @@ const tryList = dir => {
     return [];
   }
 };
+const originOf = dir => {
+  try {
+    return sh("git", ["-C", dir, "config", "--get", "remote.origin.url"]);
+  } catch {
+    return null; // no origin remote
+  }
+};
+
+// ---- Workspace roots -----------------------------------------------------------------------------
+
+/** The workspace file in `dir` itself (never a parent's: no walking up), or null. */
+const workspaceAt = dir => {
+  const c = tryJson(join(dir, "hashsmith.json"));
+  return isObj(c) && !c.__invalid && "repositories" in c ? c : null;
+};
+
+/** The top folder of the Git repository holding `dir` (git walks up), or null. */
+const gitTop = dir => {
+  try {
+    return realpathSync.native(sh("git", ["-C", dir, "rev-parse", "--show-toplevel"]));
+  } catch {
+    return null;
+  }
+};
+
+/** A listed path on disk: inside the workspace after following symlinks, and the top of a Git
+ *  repository of its own (a bare or broken .git would let git walk up into an outer repository).
+ *  A path that does not exist is inside on paper and not a repository. */
+const workspaceChild = (root, path) => {
+  const rootReal = realpathSync.native(root);
+  let real;
+  try {
+    real = realpathSync.native(join(root, path));
+  } catch {
+    return { inside: true, git: false, dir: null };
+  }
+  const inside = real.startsWith(rootReal + sep);
+  return { inside, git: inside && existsSync(join(real, ".git")) && gitTop(real) === real, dir: real };
+};
+
+/** The folder `--repo <name>` names: a listed key with a valid path to a repository inside. */
+const resolveRepository = (root, c, name) => {
+  const repos = isObj(c.repositories) ? c.repositories : {};
+  const names = Object.keys(repos);
+  if (!REPO_NAME.test(name) || !Object.hasOwn(repos, name))
+    return { error: `No repository "${name}" in the workspace's hashsmith.json.`, repositories: names };
+  const path = repos[name]?.path;
+  const child = relativePath(path) ? workspaceChild(root, path) : null;
+  if (!child?.inside || !child.git) return { error: `repositories.${name} is not a Git repository inside the workspace: run check-config.` };
+  return { dir: child.dir };
+};
+
+const stdinJson = () => {
+  const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
+  try {
+    return JSON.parse(input);
+  } catch {
+    return undefined;
+  }
+};
+
+/** What runs at a workspace root without --repo; everything else needs a repository. */
+const WORKSPACE_COMMANDS = {
+  "check-config": (_args, root, c) => {
+    let errors = checkConfig(c);
+    // Inside a repository, session-start would take the session for that one repository.
+    if (gitTop(root)) errors.push("A workspace root must not be inside a Git repository; it is a plain folder holding them.");
+    if (!errors.length) {
+      const children = {};
+      for (const [name, { path }] of Object.entries(c.repositories)) {
+        const child = workspaceChild(root, path);
+        children[name] = { ...child, config: child.git ? tryJson(join(child.dir, "hashsmith.json")) : null };
+      }
+      errors = checkWorkspace(c, children);
+    }
+    return errors.length ? { ok: false, errors } : { ok: true };
+  },
+  // Tags come from HashOps: stdin only. Each repository answers to its key and to its folder and
+  // origin names, as repo-match does in a single repository.
+  "repo-match": (_args, root, c) => {
+    const tags = tagsFrom(stdinJson());
+    if (!tags) return { error: "stdin must be the ticket's tags: a JSON array, or get_task's result" };
+    const probes = {};
+    for (const [name, entry] of Object.entries(isObj(c.repositories) ? c.repositories : {})) {
+      const child = relativePath(entry?.path) ? workspaceChild(root, entry.path) : null;
+      const own = child?.git ? repoProbes(basename(child.dir), originOf(child.dir)) : [];
+      // The listed folder's name too, when it is a symlink to a folder named otherwise.
+      probes[name] = [...new Set([plainName(name), plainName(basename(entry?.path ?? "")), ...own])].filter(Boolean);
+    }
+    return { workspace: true, ...workspaceRoute(tags, probes) };
+  },
+};
 
 const COMMANDS = {
   // Link URLs come from HashOps, where any lead can store one: read them from stdin, never argv,
   // so no URL is ever on a shell command line.
   "repo-slug": () => {
-    let originUrl = null;
-    try {
-      originUrl = sh("git", ["config", "--get", "remote.origin.url"]);
-    } catch {
-      // no origin remote
-    }
+    const originUrl = originOf(".");
     const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
     const links = input ? JSON.parse(input) : [];
     return { origin: repoSlug(originUrl), matches: repoMatches(originUrl, links), slugs: Object.fromEntries(links.map(u => [u, repoSlug(u)])) };
   },
   // Project names come from HashOps too: stdin only, like the link URLs.
   "project-candidates": () => {
-    let originUrl = null;
-    try {
-      originUrl = sh("git", ["config", "--get", "remote.origin.url"]);
-    } catch {
-      // no origin remote
-    }
+    const originUrl = originOf(".");
     const top = repoTop();
     const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
     let projects;
@@ -603,19 +800,8 @@ const COMMANDS = {
   },
   // Tags come from HashOps too (anyone on the board can add one): stdin only.
   "repo-match": () => {
-    let originUrl = null;
-    try {
-      originUrl = sh("git", ["config", "--get", "remote.origin.url"]);
-    } catch {
-      // no origin remote
-    }
-    const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
-    let tags;
-    try {
-      tags = tagsFrom(JSON.parse(input));
-    } catch {
-      tags = null;
-    }
+    const originUrl = originOf(".");
+    const tags = tagsFrom(stdinJson());
     if (!tags) return { error: "stdin must be the ticket's tags: a JSON array, or get_task's result" };
     const probes = repoProbes(basename(repoTop()), originUrl);
     return { probes, ...repoMatch(tags, probes) };
@@ -630,7 +816,7 @@ const COMMANDS = {
       return { error: "stdin must be get_board's lists: a JSON array, or the board with its lists" };
     }
     const lists = Array.isArray(board) ? board : (board?.result?.lists ?? board?.lists);
-    return listsBeforeTodo(lists, tryJson(join(repoTop(), "hashsmith.json"))?.hashops?.lists);
+    return listsBeforeTodo(lists, tryJson("hashsmith.json")?.hashops?.lists); // run at the repo top, or the workspace root
   },
   "env-keys": () => {
     const example = tryRead(".env.example");
@@ -645,6 +831,10 @@ const COMMANDS = {
     const c = tryJson("hashsmith.json");
     if (c === null) return { ok: false, errors: ["hashsmith.json not found at the repo root."] };
     if (c.__invalid) return { ok: false, errors: ["hashsmith.json is not valid JSON."] };
+    // A workspace file is checked only at its own root (WORKSPACE_COMMANDS); in a repository the
+    // hooks treat it as broken, so it must not pass here.
+    if (isObj(c) && "repositories" in c)
+      return { ok: false, errors: ["hashsmith.json here is a workspace file: run check-config at the workspace root; a repository's own file has no repositories."] };
     const errors = checkConfig(c);
     return errors.length ? { ok: false, errors } : { ok: true };
   },
@@ -754,17 +944,41 @@ const COMMANDS = {
     ),
 };
 
+/** Where a command runs. At a workspace root: in the repository `--repo` names, or at the root for a
+ *  workspace command, or not at all. `--repo` anywhere else fails. Returns `{result}` when the
+ *  command already ran (or cannot), else `{args}` to run COMMANDS[cmd] at the repo's top level. */
+function route(cmd, argv) {
+  const flag = parseRepoFlag(argv);
+  if (flag.error) return { result: { error: flag.error } };
+  const root = process.cwd();
+  const workspace = workspaceAt(root);
+  if (flag.repo !== null) {
+    if (!workspace) return { result: { error: "--repo works only at a workspace root (a hashsmith.json with repositories)." } };
+    const target = resolveRepository(root, workspace, flag.repo);
+    if (target.error) return { result: target };
+    process.chdir(target.dir); // resolveRepository checked it is a repository's own top folder
+  } else if (workspace) {
+    if (WORKSPACE_COMMANDS[cmd]) return { result: WORKSPACE_COMMANDS[cmd](flag.args, root, workspace) };
+    if (cmd === "lists-before-todo" || cmd === "feedback-target") return { result: COMMANDS[cmd](flag.args) };
+    return { result: { error: "This is a workspace root: pass --repo <name>.", repositories: Object.keys(workspace.repositories ?? {}) } };
+  }
+  return { args: flag.args };
+}
+
 if (isMain(import.meta.url)) {
-  const [cmd, ...args] = process.argv.slice(2);
+  const [cmd, ...argv] = process.argv.slice(2);
   if (!COMMANDS[cmd]) {
-    process.stderr.write(`usage: hashsmith.mjs <${Object.keys(COMMANDS).join("|")}> [args]\n`);
+    process.stderr.write(`usage: hashsmith.mjs <${Object.keys(COMMANDS).join("|")}> [args] [--repo <name> at a workspace root]\n`);
     process.exit(2);
   }
-  // Every command reads the repo's root files (hashsmith.json, .env.example, …), even from a subfolder.
-  const top = repoTop();
-  if (top !== process.cwd()) process.chdir(top);
-  const result = COMMANDS[cmd](args);
+  let { result, args } = route(cmd, argv);
+  if (result === undefined) {
+    // Every command reads the repo's root files (hashsmith.json, .env.example, …), even from a subfolder.
+    const top = repoTop();
+    if (top !== process.cwd()) process.chdir(top);
+    result = COMMANDS[cmd](args);
+  }
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  if ((cmd === "check-config" || cmd === "feedback-target") && !result.ok) process.exit(1);
   if (result?.error) process.exit(2);
+  if ((cmd === "check-config" || cmd === "feedback-target") && !result.ok) process.exit(1);
 }

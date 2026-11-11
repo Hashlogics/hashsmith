@@ -740,7 +740,12 @@ an onboarded repo. "Never another connection" applies to Hashsmith's own work on
    nothing. A single workspace session (one `hashsmith.json` with a
    `repositories` map, a repository path for the CLI and the guard hooks) changes how every guard
    finds its config, so it is planned separately in `docs/plans/2026-11-05-workspace-repositories.md`
-   rather than built here.
+   rather than built here. **Approved 2026-11-11 (HSM-18)** with one change: each repository keeps
+   its own complete `hashsmith.json`, and the workspace root's file holds only the shared
+   `hashops` block and a `repositories` map (name → `{path}`); `check-config` at the root fails
+   when a repository's block differs. Built in slices: the CLI's `--repo` routing first (the scope
+   hook meanwhile treats a workspace file as no config, so writes there ask), the guard hooks in a
+   release of their own.
 3. **Lessons flowing into the shared plugin.** Feedback reports (§12) are written in general
    terms: no client names, project names, code, ids or data. The developer sees the full text
    before it is filed, and the maintainer reviews it again before anything ships.
