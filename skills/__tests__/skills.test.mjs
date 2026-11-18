@@ -129,6 +129,19 @@ describe("skills and agents", () => {
     const fm = frontmatter(readFileSync(join(root, "agents", "code-investigator.md"), "utf8"));
     assert.doesNotMatch(fm.tools ?? "", /Bash/);
   });
+  it("health-auditor is read-only too: checklist items from HashOps cannot run commands", () => {
+    const fm = frontmatter(readFileSync(join(root, "agents", "health-auditor.md"), "utf8"));
+    assert.equal(fm.tools, "Read, Grep, Glob");
+  });
+  it("health-check only touches checklists through the guarded pair, after start_health_report", () => {
+    const text = readFileSync(join(root, "skills", "health-check", "SKILL.md"), "utf8");
+    assert.match(text, /`start_health_report`[\s\S]*`get_checklist_instance` with the `checklistId` it returned/);
+    assert.doesNotMatch(text, /list_checklist_(templates|instances)/, "ids come from start_health_report, never from a listing");
+    const hooks = JSON.parse(readFileSync(join(root, "hooks", "hooks.json"), "utf8"));
+    const post = (hooks.hooks.PostToolUse ?? []).find(h => h.hooks.some(c => c.command.includes("health-pin.mjs")));
+    assert.ok(post && new RegExp(`^(?:${post.matcher})$`).test("mcp__plugin_hashsmith_hashops__start_health_report"), "health-pin must run after start_health_report");
+    assert.ok(new RegExp(`^(?:${post.matcher})$`).test("mcp__plugin_hashsmith_hashops__get_checklist_instance"), "and after get_checklist_instance");
+  });
   for (const file of agentFiles)
     it(`agents/${file} follows the rules`, () => checkDoc(join(root, "agents", file), file.replace(/\.md$/, ""), { maxLines: 250 }));
 });

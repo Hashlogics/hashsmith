@@ -15,14 +15,17 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 │  Claude Code session (started in ONE project repo)                           │
 │  ├─ conduct rules + context    ◀── SessionStart hook                         │
 │  ├─ /hashsmith:* skills        (markdown instructions the model follows)     │
-│  ├─ helper agents              code-investigator, diff-reviewer              │
+│  ├─ helper agents              code-investigator, diff-reviewer,             │
+│  │                             health-auditor                                │
 │  ├─ PreToolUse hooks           git-guard, env-guard, hashops-scope,          │
 │  │                             config-guard: every matching tool call        │
+│  ├─ PostToolUse hook           health-pin: health-report ids for the scope   │
 │  ├─ Hashsmith CLI              scripts/hashsmith.mjs (deterministic logic)   │
 │  └─ MCP servers                hashops (HTTP + OAuth), playwright (npx)      │
 │                                                                              │
 │  project repo:  code, its CLAUDE.md and skills, hashsmith.json (committed)   │
-│  ~/.hashsmith/: last_seen_version, projects/<KEY>/{handoffs,design,qa}/      │
+│  ~/.hashsmith/: last_seen_version, projects/<KEY>/{handoffs,design,qa}/,     │
+│                 pins/<session>.json                                          │
 └──────────────────────────────────────────────────────────────────────────────┘
           │ MCP over HTTPS, as the developer          │ gh CLI
           ▼                                           ▼
@@ -51,6 +54,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `hooks/*.mjs` | One file per hook; `lib.mjs` holds the shared parts | `node`, per event |
 | `hooks/feedback-board.json` | The Hashsmith project's own board, its Backlog list and the feedback tags: the one cross-project target the scope hook allows, and where `feedback` files | `hashops-scope.mjs`, the CLI's `feedback-target` |
 | `hooks/hashops-tools.json` | `hashsmith`: the HashOps tools Hashsmith's connection may call (exactly the ones the skills name). `writes`: every HashOps write tool | `hashops-scope.mjs` |
+| `hooks/health-pin.mjs` | After `start_health_report` and `get_checklist_instance`, records this session's health-report checklist and item ids in `~/.hashsmith/pins/`; the scope hook asks for any other checklist id (design §10) | `node`, PostToolUse |
 | `reference/conduct.md` | The behaviour contract injected into every session (≤ 60 lines) | `session-start.mjs` |
 | `reference/*.md` | Templates and rules the skills read when they need them: config, ticket, ticket assessment, handoff, changelog, verification report, feedback, fallback standards, workspace mode (`workspace.md`: what every skill adds at a workspace root) | skills, on demand |
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |

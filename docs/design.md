@@ -562,8 +562,10 @@ session (`pass (developer-confirmed, <date>)`). A pass reads "QA passed
 **Use when:** the developer starts a session or asks what to do next. The one entry point.
 
 Checks onboarding, runs `sync`, counts the board's lists, and proposes in this order: fix a QA
-bounce, QA what is waiting, finish a handoff, work the next To Do ticket, intake. It starts nothing
-without a yes.
+bounce, QA what is waiting, finish a handoff, work the next To Do ticket, intake. When
+`get_project_health` shows no report or an unfinished one, the status line says so, and
+`health-check` is offered (for leads: HashOps refuses anyone else, and no allowed tool says who
+leads) only when no ticket work applies (HSM-24). It starts nothing without a yes.
 
 **Lists before To Do (decided 2026-11-05, HSM-13).** `next` also reads every active list that comes
 before To Do on the board, whatever it is called (Backlog, Icebox, Ideas), and leaves out the lists
@@ -607,6 +609,31 @@ checkpoint where corrections were captured. See §12.
 4. Check the Hashsmith board for duplicates; a match is still filed, tagged `duplicate` (§12).
 5. Draft in general terms (`reference/feedback-template.md`), show, and after a yes `create_task`
    in Backlog. HashOps makes the developer the reporter. No HashOps: a local file instead.
+
+### `health-check`
+
+**Use when:** a lead wants the project's HashOps health report filled in, or asks why its health
+is low or 0% (decided 2026-11-19, HSM-24). `next` offers it when the project has no report or an
+unfinished one.
+
+1. `get_project_health`: score, band, report state, sections. A completed report is replaced only
+   for a new period or on request: opening a new one drops the live score until it is filled.
+2. `start_health_report` (opens or resumes; a yes before it opens a new one; only the project's
+   leads may), then `get_checklist_instance` on the checklist it returns for the items.
+3. Audit: one read-only `health-auditor` agent per section, in parallel; each item is pass, fail
+   or needs-a-human with file-and-line evidence. Commands the project names (tests, build, lint)
+   run locally in the session; nothing touches a real environment without asking.
+4. The needs-a-human items asked once (Met / Not met / Leave pending), then a draft of every item
+   with its evidence and the projected score (by count: HashOps weights are not exposed), and one
+   yes.
+5. `set_checklist_item_status` per changed item (pass = `completed`, fail = `rejected`; an item
+   set the other way goes back to `pending` first, as the app does), then the new score.
+6. Failed items are offered to `intake` as raw requirements.
+
+**Limits.** No HashOps tool completes a report: the lead presses **Mark as Completed** on the
+checklist page, which waits for every required item; HashOps completes open reports at the end of
+the period. HashOps's checklist template listing returns no items, so the skill does not use it.
+A tool to complete a report would be a hashops PR first.
 
 ## 7. Ticket template
 
@@ -691,6 +718,7 @@ A project's own `deny` rules still win over the plugin.
 | `git-guard.mjs` | PreToolUse Bash | **ask** for `git switch -c ai/*` and `git switch ai/*`. **Deny** every other git write: `add`, `commit`, `push`, `pull`, `stash`, `reset`, `restore`, `checkout`, `merge`, `rebase`, `cherry-pick`, `revert`, `rm`, `mv`, `clean`, `tag`, `branch -d/-D/-m/-M`, `update-index`, `apply --index/--cached`. Read-only git and `git fetch` are allowed |
 | `env-guard.mjs` | PreToolUse Read, Bash | **Deny** reading `.env*` (except `.env.example`). **Ask** before anything that touches a real environment: `supabase db push`, `supabase functions deploy`, `supabase secrets set`, `supabase link`, `prisma migrate deploy`, `alembic upgrade` outside compose, `vercel --prod`, `scripts/tenant/*`, `scripts/ops/*` |
 | `hashops-scope.mjs` | PreToolUse `mcp__.*` | See §10 |
+| `health-pin.mjs` | PostToolUse `start_health_report`, `get_checklist_instance` (Hashsmith's connection) | Records, per session, the health report's checklist and its item ids for `hashops-scope.mjs`. See §10 |
 | `config-guard.mjs` | PreToolUse Write, Edit on `hashsmith.json` | See §5 |
 | `session-start.mjs` | SessionStart | Loads `reference/conduct.md`, checks the scope, shows what's new since the last version this person saw (stored in `~/.hashsmith/last_seen_version`) |
 
@@ -718,6 +746,18 @@ offers every tool their permissions allow (about 158, 69 of them writes). `hasho
 server-side layer exists too: each HashOps connection has an access level (read only / work /
 full, default work) on the profile's Connected apps card, enforced by the MCP server for every
 client. Hashsmith needs **Work**: every tool it uses is a Work tool.
+
+**Health reports, pinned (decided 2026-11-19, HSM-24).** `health-check` needs four more tools:
+`get_project_health`, `start_health_report` (both take a `project_id`, so the checks below cover
+them), `get_checklist_instance` and `set_checklist_item_status`. The last two take only an id:
+nothing in the input names a project, and checklists also hold people's onboarding and
+offboarding, which are HR records. So they are pinned: `health-pin.mjs` (PostToolUse) records
+the checklist id `start_health_report` returns for this session's project, and the item ids
+`get_checklist_instance` then returns for that checklist, in
+`~/.hashsmith/pins/<session id>.json` (other sessions' files are dropped after a week).
+`hashops-scope.mjs` asks for either tool on any id not recorded, reads included. A result the
+hook cannot read records nothing, so the next call asks (fail closed). The alternative, a
+project-scoped health tool in HashOps, was left for later: it needs a hashops PR.
 
 **The developer's own HashOps tasks stay outside (decided 2026-11-05, HSM-17).** A developer asked
 a Hashsmith session to log their Daily Recap; the guard denied `log_daily_recap`, and nothing said

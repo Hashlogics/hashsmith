@@ -20,8 +20,8 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.8.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
-`feedback`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
+**Status: 0.9.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+`feedback`, `health-check`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
 
@@ -129,13 +129,14 @@ always just say what you want instead.
 
 | Command | What it does |
 | --- | --- |
-| `/hashsmith:next` | Reads the board and proposes, in this order: fix a QA bounce, QA what's waiting, finish a handoff, work the next ticket (from a list before To Do, such as Backlog, when To Do is empty), or intake |
+| `/hashsmith:next` | Reads the board and proposes, in this order: fix a QA bounce, QA what's waiting, finish a handoff, work the next ticket (from a list before To Do, such as Backlog, when To Do is empty), intake, or fill the health report when the project has none |
 | `/hashsmith:intake` | Paste notes, a doc or a Slack thread, or name a HashOps meeting. Hashsmith reads the code, checks the board for duplicates, asks its questions once, shows draft tickets, and creates them in To Do after your yes |
 | `/hashsmith:work [KEY-12]` | Briefs you on the ticket in plain words, then plans it and waits for your yes. Then it creates `ai/KEY-12-…` (you approve), implements, runs the project's checks and a fresh-eyes review until green, and hands off in Review with the change unstaged |
 | `/hashsmith:sync` | Moves tickets to match git, after your yes: Review → QA once the PR is open |
 | `/hashsmith:design` | Designs or polishes a screen. Your project's design rules come first, then your own, then Hashsmith's taste kit. It takes screenshots at desktop and mobile widths and does up to three critique rounds. `work` runs it for UI tickets |
 | `/hashsmith:qa [KEY-12]` | On your local app only: switches to the PR branch (you approve) and logs in as the right test user. Then it runs each acceptance criterion with screenshots attached to the ticket, and moves the ticket to Done or back to To Do with the failing steps. A project with no web UI is checked against its code and tests instead |
 | `/hashsmith:feedback [what went wrong]` | Files one ticket per point on the Hashsmith board's Backlog, with you as the reporter, after your yes. Written in general terms (no client, project or code specifics), with a concrete before/after edit to the skill. Works in any repo |
+| `/hashsmith:health-check` | Fills in the project's HashOps health report (leads only). It audits the repo against each checklist item with evidence, asks you what the code can't show, shows the draft and projected score, and marks the items after your yes. You press **Mark as Completed** in HashOps |
 | `/hashsmith:onboard-project` | Set up or refresh the project's `hashsmith.json` |
 
 ### A ticket's life

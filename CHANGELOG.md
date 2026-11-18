@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.9.0 — 2026-11-19
+
+- New `/hashsmith:health-check` (project leads): fills in the project's HashOps health report. It
+  audits the repo against each item with evidence, asks you what the code can't show, shows the
+  draft and projected score, and marks the items after your yes. You press Mark as Completed.
+- `/hashsmith:next` offers it when the project has no health report or an unfinished one.
+
 ## 0.8.1 — 2026-11-18
 
 - Board tracking fix: a ticket branch cut after an older commit that mentions the ticket is no

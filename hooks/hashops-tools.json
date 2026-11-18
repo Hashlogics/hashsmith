@@ -9,7 +9,9 @@
     "create_task",
     "finish_task_attachment",
     "get_board",
+    "get_checklist_instance",
     "get_meeting",
+    "get_project_health",
     "get_task",
     "list_boards",
     "list_meetings",
@@ -18,6 +20,8 @@
     "list_project_tags",
     "list_tasks",
     "move_task",
+    "set_checklist_item_status",
+    "start_health_report",
     "start_task_attachment",
     "update_project",
     "update_task"

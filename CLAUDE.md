@@ -49,8 +49,8 @@ Node 22 or newer. No npm install is needed; the plugin has no dependencies.
 - `skills/<name>/SKILL.md`: shipped skills. `skills/__tests__/skills.test.mjs` checks frontmatter,
   the 250-line budget, that every `reference/…`, `references/…` and agent they name exists, that
   every git command they name passes git-guard, and that no literal id slips in.
-- `agents/`: helper agents with restricted tools (`code-investigator` is read-only with no Bash;
-  `diff-reviewer`).
+- `agents/`: helper agents with restricted tools (`code-investigator` and `health-auditor` are
+  read-only with no Bash; `diff-reviewer`).
 - `vendor/taste-skill/`: the upstream taste skill (MIT), vendored whole and pinned in its
   `SOURCE.md`, used by the `design` skill. Outside `skills/` so it is not registered as a skill.
 - `evals/`: manual golden scenarios (`evals/README.md`); run the ones a change touches before a
@@ -141,5 +141,9 @@ Keep this list current: add what you defer, remove what you finish.
   `work-workspace-two-repos`, `work-workspace-untagged`, `work-workspace-tag-missing`,
   `work-repo-routing`, `sync-workspace-partial`, `qa-workspace`) in a scratch workspace on a
   scratch HashOps project.
+- [ ] **Health check (HSM-24, 0.9.0):** run the `health-check-*` evals live, on a scratch project
+  with health tracking on. No HashOps tool completes a report (the lead presses Mark as
+  Completed); a project-scoped tool to set items and complete the report would be a hashops PR,
+  and could then replace the session pins in `hooks/health-pin.mjs`.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

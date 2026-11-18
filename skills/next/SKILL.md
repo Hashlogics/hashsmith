@@ -46,6 +46,10 @@ Also note the working tree (CLI `tree`): uncommitted changes mean a handoff is w
 developer, and Hashsmith cannot switch branches until it is committed. Under
 `repo.branch_policy` `current`, `work` never switches and runs on a dirty tree.
 
+Also `get_project_health` with `{project_id}`: when the project has no report or an unfinished
+one (`none`, `not_started`, `in_progress`), add it to the status line ("Health 0%, no report: a
+lead can run `/hashsmith:health-check`"). Tracking off: nothing.
+
 ## 4. Propose
 
 Show a short status, the lists before To Do first under their own names (`Backlog 3 · To Do 6
@@ -67,9 +71,12 @@ stop on uncommitted changes. Under `current`, choices 1 and 4 need no clean tree
    otherwise nothing moves.
 5. **New requirements:** `/hashsmith:intake`, when the developer has notes, a doc, a Slack thread
    or a meeting to turn into tickets.
+6. **Fill the health report:** `/hashsmith:health-check`, only when choices 1 to 4 do not apply
+   and the status line shows the health note. Only the project's leads can run it (HashOps
+   refuses anyone else); label it "for the project's leads". It needs no clean tree.
 
 Ask in one question with these options and the recommendation's one-line reason. The developer's
 free text overrides the menu ("do ACME-9", "intake this: …"). Then run the chosen skill.
 
 When the board is empty (the lists before To Do too) and nothing is waiting, say so and offer
-intake.
+intake, and the health report when choice 6 applies.

@@ -14,9 +14,13 @@
 //    workspace file found any other way (at a repository's top) is never trusted.
 // 3. In an onboarded repo, a HashOps write through another connection to the same server (for
 //    example the developer's own "peoplemuster") asks: Hashsmith's guards do not cover it.
+// 4. get_checklist_instance and set_checklist_item_status take only an id, so the project cannot
+//    be checked from the input, and checklists also hold people's onboarding and offboarding. They
+//    pass only for the health report start_health_report opened for this project in this session,
+//    and its items (recorded by health-pin.mjs); any other id asks, reads included.
 // A call that passes gets no opinion: RLS and the normal permission flow decide.
 import { readFileSync } from "node:fs";
-import { decide, isMain, projectDir, readConfig, readWorkspace, repoRoot, run, workspaceProblems } from "./lib.mjs";
+import { decide, isMain, projectDir, readConfig, readPins, readWorkspace, repoRoot, run, workspaceProblems } from "./lib.mjs";
 
 const PREFIX = "mcp__plugin_hashsmith_hashops__";
 const isRead = tool => /^(get|list|search|who)_/.test(tool);
@@ -46,12 +50,27 @@ export function scopeConfig(dir) {
   return ws ? { ...ws, [PROBLEMS]: workspaceProblems(dir, ws) } : null;
 }
 
-export function evaluate(event, config = scopeConfig(projectDir(event)), feedback = feedbackBoard()) {
+/** Why a scope config's hashops block cannot be trusted ([] when it can): only a workspace file
+ *  read at the session folder, with every repository agreeing, is trusted. */
+function untrusted(config) {
+  if (!(config !== null && typeof config === "object" && "repositories" in config)) return [];
+  return Array.isArray(config[PROBLEMS]) ? config[PROBLEMS] : ["it is not at the session folder"];
+}
+
+/** The hashops block that scopes this session, or {} when there is none to trust. */
+export function trustedHashops(config) {
+  return (untrusted(config).length ? null : config?.hashops) ?? {};
+}
+
+/** Tools that take only an id: the argument, and the pin list it must be in. */
+const PINNED = { get_checklist_instance: ["instance_id", "checklists"], set_checklist_item_status: ["item_id", "items"] };
+
+export function evaluate(event, config = scopeConfig(projectDir(event)), feedback = feedbackBoard(), pins = readPins(event.session_id)) {
   const name = String(event.tool_name ?? "");
   const input = event.tool_input ?? {};
   const workspace = config !== null && typeof config === "object" && "repositories" in config;
-  const problems = workspace ? (Array.isArray(config[PROBLEMS]) ? config[PROBLEMS] : ["it is not at the session folder"]) : [];
-  const h = (problems.length ? null : config?.hashops) ?? {};
+  const problems = untrusted(config);
+  const h = trustedHashops(config);
   if (!name.startsWith(PREFIX)) {
     const m = /^mcp__(.+?)__([a-z_]+)$/.exec(name);
     // In a workspace, a broken one too: its checks would cover these writes only once it checks out.
@@ -62,6 +81,14 @@ export function evaluate(event, config = scopeConfig(projectDir(event)), feedbac
   const tool = name.slice(PREFIX.length);
   if (!TOOLS.hashsmith.includes(tool))
     return decide("deny", `Hashsmith's HashOps connection only allows the tools its skills use (hooks/hashops-tools.json); \`${tool}\` is not one of them. It is for Hashsmith's developer workflow only. The developer's own HashOps tasks (Daily Recaps, to-dos, leave) go through the HashOps app or their own HashOps connection, which asks before each write in an onboarded repo.`);
+
+  if (tool in PINNED) {
+    const [arg, list] = PINNED[tool];
+    const id = String(input[arg] ?? "").trim().toLowerCase();
+    const pinned = !!id && !!h.project_id && pins?.project_id === h.project_id && Array.isArray(pins[list]) && pins[list].includes(id);
+    if (pinned) return null;
+    return decide("ask", `\`${tool}\` takes only an id, so Hashsmith cannot check which project it is on, and ${id ? `${arg} ${id}` : `this ${arg}`} is not on this project's health report as opened in this session (start_health_report for this project, then get_checklist_instance on the checklist it returns). Checklists also hold people's onboarding and offboarding. Confirm only if this is this project's health report.`);
+  }
 
   if (!h.project_id) {
     if (isRead(tool)) return null;

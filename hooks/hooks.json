@@ -1,5 +1,5 @@
 {
-  "description": "Hashsmith guardrails (design §9): conduct rules at session start; git, env, HashOps-scope and hashsmith.json guards before tool calls.",
+  "description": "Hashsmith guardrails (design §9): conduct rules at session start; git, env, HashOps-scope and hashsmith.json guards before tool calls; health-report pins after them.",
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\"", "timeout": 10 }] }
@@ -9,6 +9,9 @@
       { "matcher": "Read|Grep|Bash", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/env-guard.mjs\"", "timeout": 10 }] },
       { "matcher": "mcp__.*", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/hashops-scope.mjs\"", "timeout": 10 }] },
       { "matcher": "Write|Edit|MultiEdit", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/config-guard.mjs\"", "timeout": 10 }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "mcp__plugin_hashsmith_hashops__(start_health_report|get_checklist_instance)", "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/health-pin.mjs\"", "timeout": 10 }] }
     ]
   }
 }

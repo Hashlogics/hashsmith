@@ -2,7 +2,8 @@
 // already requires (22+). Each hook reads the event JSON on stdin and prints at most one JSON
 // object on stdout. Printing nothing means "no opinion": Claude Code's normal permission flow,
 // including the project's own deny rules, decides.
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -60,6 +61,38 @@ export function readConfig(dir) {
 }
 
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
+
+// Health-report pins (design §10, HSM-24): per session, the checklist that start_health_report
+// opened for this project and the ids of its items. health-pin.mjs writes them, hashops-scope.mjs
+// reads them. A session id that is not a plain name records and finds nothing (so the call asks).
+const SESSION_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const PIN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const pinDir = () => join(homedir(), ".hashsmith", "pins");
+
+/** This session's pins ({project_id, checklists, items}), or null when there are none. */
+export function readPins(sessionId) {
+  if (!SESSION_ID.test(String(sessionId ?? ""))) return null;
+  try {
+    const p = JSON.parse(readFileSync(join(pinDir(), `${sessionId}.json`), "utf8"));
+    return isObj(p) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Saves this session's pins and drops other sessions' files older than a week. */
+export function writePins(sessionId, pins) {
+  if (!SESSION_ID.test(String(sessionId ?? ""))) return;
+  const dir = pinDir();
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${sessionId}.json`), JSON.stringify(pins));
+  for (const f of readdirSync(dir))
+    try {
+      if (f.endsWith(".json") && Date.now() - statSync(join(dir, f)).mtimeMs > PIN_TTL_MS) unlinkSync(join(dir, f));
+    } catch {
+      // another session's cleanup got there first
+    }
+}
 
 /** A repository name in a workspace file: also what the CLI's --repo takes. */
 export const REPO_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
