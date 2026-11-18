@@ -28,10 +28,17 @@ own steps and adds what its section here says. Every listed repository keeps its
   `repositories` (the names its `repo:` tags match), `unknown` (tags naming none) and
   `ambiguous` (tags naming several). No `repo:` tag, an `unknown` or an `ambiguous` one: ask which
   repositories the ticket needs (options: the names), and offer `update_task` with its current
-  tags plus `repo:<name>` for each (after a yes; a tag the project lacks needs
-  `create_project_tag` first, also after a yes). Never guess from the title. The tags are how
+  tags plus `repo:<name>` for each (after a yes; a tag the project lacks follows **Missing
+  tags** first). Never guess from the title. The tags are how
   sync and qa find the parts later, so work plans nothing until they name every part: on a no to
   the tags, stop.
+- **Missing tags.** A ticket cannot carry a tag the project lacks: `list_project_tags` first.
+  With `create_project_tag` among the session's tools (a deferred one counts), offer it for each
+  missing `repo:<name>` (after a yes). Without it (HashOps shows it only to people with its
+  project-management permission), never call `update_task` with a missing tag: name every
+  missing tag of every ticket in hand exactly, in one message, ask the developer or a project
+  lead to create them in HashOps (the project's Manage tags), and run `list_project_tags` again
+  before tagging or creating a ticket with them.
 - **Root records.** `learned` keys and intake's `processed_meetings` go in the root
   `hashsmith.json`, which no repository commits: say so when writing one, so the developer
   shares it. Handoff patches saved here are found from the root (`handoff-patch --repo`), not
@@ -54,8 +61,9 @@ move it aside first.
    and `repo-slug` with `--repo <name>` for each picked repository, the union of their
    candidates, and a link that matches any one of them. A repository that already has its own
    `hashsmith.json`: its `hashops` block is the proposal; when two disagree, ask which project
-   and board the workspace uses. `list_project_tags`, and offer `create_project_tag` for each
-   `repo:<name>` the project lacks (a ticket cannot carry a tag the project does not have).
+   and board the workspace uses. Then the `repo:<name>` tag of every picked repository, as in
+   **Missing tags**; without `create_project_tag`, name the missing ones once, carry on, and
+   repeat them in step 5 as tags for a project lead to create.
 3. **Each repository.** onboard-project §4–5 for each, in turn, with `--repo <name>` and
    `git -C <path>`, reading its files under `<path>/`. A repository already onboarded keeps its
    values, as in a refresh. In §5, "Branch creation allowed" is CLI `git-switch` at the root, and
@@ -67,12 +75,14 @@ move it aside first.
 5. **Finish.** Tell the developer to start a new Claude Code session in this folder, so session
    start reads the workspace, and to commit each repository's file in that repository. The root
    file sits outside every repository; say so, and suggest keeping a copy where the team finds it.
+   List any `repo:` tag still missing (step 2): routing waits for them.
 
 ## intake
 
 Read the code per repository: the commit is `git -C <path> rev-parse --short HEAD` for each, and
 each `code-investigator` agent is told which repository's folder its candidate lands in. Every
 draft ticket proposes its `repo:<name>` tags (one per repository it touches), shown with the draft.
+A proposed tag the project lacks follows **Missing tags** before any `create_task`.
 
 ## design
 

@@ -730,9 +730,15 @@ describe("work on the base branch", () => {
   it("lets a pushed base-branch commit win over an ai/* branch with no PR only when that branch holds no work of its own", () => {
     const review = { branch: "ai/HSM-1-x", pr: null, state: "review", ambiguous: false, local: true };
     const pushed = cli.baseStateFor("main", [{ sha: "a1b2c3d", at: "2026-11-05T10:00:00+05:00" }], []);
-    const empty = { ahead: 0, dirty: false };
+    const empty = { ahead: 0, dirty: false, contains: false };
     assert.deepEqual(cli.withBase(review, pushed, empty), { ...pushed, stale_branch: "ai/HSM-1-x" }, "nothing on the branch: the work went to the base branch");
     assert.equal(cli.withBase(review, pushed, empty).branch, null);
+    assert.deepEqual(
+      cli.withBase(review, pushed, { ahead: 0, dirty: false, contains: true }),
+      review,
+      "an older mention the branch was cut after (\"chore: note for HSM-1\", then the branch): the branch is live, not left over",
+    );
+    assert.deepEqual(cli.withBase(review, pushed, { ahead: 0, dirty: false }), review, "unknown whether the branch holds the commit: keep it");
     assert.deepEqual(cli.withBase(review, pushed, { ahead: 2, dirty: false }), review, "the branch has its own commits: a teammate's mention on the base never replaces it");
     assert.deepEqual(cli.withBase(review, pushed, { ahead: 0, dirty: true }), review, "checked out with uncommitted work (a handoff waiting for its commit): keep it");
     assert.deepEqual(cli.withBase(review, pushed, null), review, "unknown: keep the branch");
@@ -744,11 +750,39 @@ describe("work on the base branch", () => {
     assert.deepEqual(cli.withBase({ ...review, ambiguous: true }, pushed, empty), { ...review, ambiguous: true }, "several branches: sync asks which is current");
     assert.deepEqual(cli.withBase(review, cli.baseStateFor(null, [], []), empty), review);
   });
+  it("reads an ai/* branch's tip from git: own commits, uncommitted changes, and whether it holds the pushed commit", () => {
+    // A fake git: the local copy exists (origin's does not); `holds` says whether the copy holds the pushed commit.
+    const fakeGit = ({ holds, ahead = 0, current = "main", status = "" }) => {
+      const calls = [];
+      const git = args => {
+        calls.push(args.join(" "));
+        if (args[0] === "branch") return current;
+        if (args[0] === "status") return status;
+        if (args[0] === "for-each-ref") return args[2] === "refs/heads/ai/HSM-1-x" ? "ai/HSM-1-x" : "";
+        if (args[0] === "rev-list" && args[2] === "refs/remotes/origin/main..refs/heads/ai/HSM-1-x") return String(ahead);
+        if (args[0] === "rev-list" && args[2] === "refs/heads/ai/HSM-1-x..a1b2c3d") return holds ? "0" : "3";
+        throw new Error(`unexpected git ${args.join(" ")}`);
+      };
+      return { git, calls };
+    };
+    assert.deepEqual(cli.branchTip(fakeGit({ holds: true }).git, "main", "ai/HSM-1-x", "a1b2c3d"), { ahead: 0, dirty: false, contains: true }, "cut after the mention");
+    assert.deepEqual(cli.branchTip(fakeGit({ holds: false }).git, "main", "ai/HSM-1-x", "a1b2c3d"), { ahead: 0, dirty: false, contains: false }, "cut before the commit");
+    assert.deepEqual(cli.branchTip(fakeGit({ holds: false, ahead: 2 }).git, "main", "ai/HSM-1-x", "a1b2c3d"), { ahead: 2, dirty: false, contains: false });
+    assert.equal(cli.branchTip(fakeGit({ holds: false, current: "ai/HSM-1-x", status: " M a.js" }).git, "main", "ai/HSM-1-x", "a1b2c3d").dirty, true);
+    assert.equal(cli.branchTip(fakeGit({ holds: false }).git, null, "ai/HSM-1-x", "a1b2c3d"), null, "no base branch: unknown");
+    const bad = fakeGit({ holds: false });
+    assert.equal(cli.branchTip(bad.git, "main", "ai/HSM-1-x", "--all"), null, "a sha that is not hex never reaches git");
+    assert.deepEqual(bad.calls, []);
+    assert.equal(cli.branchTip(() => { throw new Error("no git"); }, "main", "ai/HSM-1-x", "a1b2c3d"), null, "git fails: unknown");
+  });
   it("finds a ticket's newest saved base- or other-branch patch, never an ai/* branch's", () => {
     const f = (name, mtimeMs) => ({ name, mtimeMs });
     const names = [f("main-HSM-1.patch", 1), f("feature-payments-HSM-1.patch", 3), f("ai-HSM-3-follow-up-HSM-1.patch", 9), f("main-HSM-12.patch", 9), f("main-HSM-1-r2.patch", 9)];
-    assert.deepEqual(cli.handoffPatch(names, "HSM-1", "feature/payments"), { file: "feature-payments-HSM-1.patch", branch: "feature-payments", current: true });
-    assert.deepEqual(cli.handoffPatch(names, "HSM-1", "main"), { file: "feature-payments-HSM-1.patch", branch: "feature-payments", current: false }, "the newest, whatever branch is checked out");
+    assert.deepEqual(cli.handoffPatch(names, "HSM-1", "feature/payments", "main"), { file: "feature-payments-HSM-1.patch", branch: "feature-payments", current: true, on_base: false });
+    assert.deepEqual(cli.handoffPatch(names, "HSM-1", "main", "main"), { file: "feature-payments-HSM-1.patch", branch: "feature-payments", current: false, on_base: false }, "the newest, whatever branch is checked out");
+    assert.equal(cli.handoffPatch(names, "HSM-1", "main", "feature/payments").on_base, true, "a base with a slash is written with - in the patch name");
+    assert.equal(cli.handoffPatch(names, "HSM-12", "main", "main").on_base, true);
+    assert.equal(cli.handoffPatch(names, "HSM-12", "main", null).on_base, false, "no base branch configured: never on the base");
     assert.equal(cli.handoffPatch(names, "HSM-2", "main"), null);
     assert.equal(cli.handoffPatch([...names, f("ai-search-HSM-1.patch", 5)], "HSM-1", "ai-search").file, "ai-search-HSM-1.patch", "a branch merely starting with ai- is another branch");
     assert.equal(cli.handoffPatch(names, "../x", "main"), null, "a key that is not KEY-n finds nothing");
@@ -878,7 +912,27 @@ describe("CLI", () => {
     const out = JSON.parse(r.stdout);
     assert.equal(out["ACME-1"].path, join(handoffs, "dev-ACME-1.patch"));
     assert.equal(out["ACME-1"].branch, "dev");
+    assert.equal(out["ACME-1"].on_base, false, "no repo.base_branch stored");
     assert.equal(out["ACME-2"], null);
+  });
+  it("handoff-patch outside a git repository prints one JSON line, not a stack trace", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hashsmith-norepo-"));
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ hashops: { project_key: "ACME" }, repo: { base_branch: "dev" } }));
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const handoffs = join(home, ".hashsmith", "projects", "ACME", "handoffs");
+    mkdirSync(handoffs, { recursive: true });
+    writeFileSync(join(handoffs, "dev-ACME-1.patch"), "diff\n");
+    const r = spawnSync(process.execPath, [CLI, "handoff-patch", "ACME-1"], { cwd: dir, encoding: "utf8", env: { ...process.env, HOME: home } });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(r.stderr, "");
+    assert.deepEqual(JSON.parse(r.stdout)["ACME-1"], { path: join(handoffs, "dev-ACME-1.patch"), branch: "dev", current: false, on_base: true });
+  });
+  it("prints an unexpected failure as one JSON error line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hashsmith-norepo-"));
+    const r = spawnSync(process.execPath, [CLI, "tree"], { cwd: dir, encoding: "utf8" });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.equal(r.stderr, "");
+    assert.match(JSON.parse(r.stdout).error, /^tree failed/);
   });
   it("changelog reads the repo's top level and prints names only, never file text", () => {
     const dir = fixtureRepo();

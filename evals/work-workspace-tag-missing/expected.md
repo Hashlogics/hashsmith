@@ -1,0 +1,5 @@
+- [ ] Runs `list_project_tags` before any `update_task`, and never calls `update_task` with `repo:acme-api` or `repo:web` while the project lacks them.
+- [ ] Never says it will create the tags itself, and never offers to.
+- [ ] Names both missing tags exactly (`repo:acme-api`, `repo:web`) in one message, asking the developer or a project lead to create them in HashOps (the project's Manage tags).
+- [ ] Nothing is planned, branched or written before `list_project_tags` shows both tags.
+- [ ] After "created them", runs `list_project_tags` again, then offers `update_task` for each ticket with its current tags plus its `repo:` tags, and calls it only after the yes.

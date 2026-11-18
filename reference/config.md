@@ -105,7 +105,7 @@ JWTs, `sk_`, `ghp_`, `xox[abp]-` and `-----BEGIN` patterns; learned key names co
 | `hashops.project_id`, `project_key` | the project whose `repository` link matches `repo-slug`'s origin (`list_project_links`), else the developer's pick from `list_my_projects` |
 | `hashops.board_id` | the stored id while `get_board` finds it active in the project; else `list_boards {project_id, status: "active"}`: one → use it, several → ask |
 | `hashops.lists.*` | `get_board` list names, case-insensitive: To Do / Todo, In Progress, Review, QA, Done |
-| `hashops.ai_tag` | `hashsmith`, created with `create_project_tag` when `list_project_tags` lacks it |
+| `hashops.ai_tag` | `hashsmith`, created with `create_project_tag` when `list_project_tags` lacks it, or by a project lead when the session lacks that tool |
 | `repo.base_branch` | the PR target in the project's CLAUDE.md, else `git rev-parse --abbrev-ref origin/HEAD` |
 | `repo.branch_policy` | asked once: `managed` (default; `""` or missing means managed), `current` or `confirm` |
 | `qa.base_url` | `http://localhost:<port>` from the dev script or dev-server config |
@@ -120,6 +120,8 @@ Projects onboarded before 0.5.2 store the old default, ai, as `ai_tag`; it can c
 project's own AI tag. To move one over, with the developer's yes at each write, in this order
 (retag before switching, so no ticket in flight drops out of `sync` and `qa` halfway):
 1. `create_project_tag` with `{project_id, name: "hashsmith"}` when `list_project_tags` lacks it.
+   Without that tool in the session, ask a project lead to create `hashsmith` in HashOps, and run
+   `list_project_tags` again before step 2.
 2. For every ticket in In Progress, Review or QA, and every QA bounce in To Do, that Hashsmith
    worked (`get_task {task_code, full: true}` shows a "Plan (Hashsmith)" comment): `update_task`
    with its current tags plus `hashsmith` (`tags` replaces all tags; keep the others). Tickets

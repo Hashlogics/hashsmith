@@ -608,20 +608,44 @@ export function baseStateFor(base, pushedAll, localAll) {
 
 /** An ai/* branch with no PR hides no base-branch work: when the branch holds no work of its own
  *  (`tip.ahead`: its commits not on origin/<base>, local or origin copy, is 0; and it is not checked
- *  out with uncommitted changes, `tip.dirty`), a pushed base-branch commit carrying the key wins.
- *  The work is then base-branch work: `branch` is null, and the leftover branch is `stale_branch`.
- *  A branch with its own commits, a waiting uncommitted handoff on it, or an unknown tip stays, so
- *  a teammate's "fix seen while testing ACME-22" on the base never replaces live work. */
+ *  out with uncommitted changes, `tip.dirty`) and was cut before the pushed commit carrying the key
+ *  (`tip.contains`: that commit is in neither copy), that commit wins. The work is then base-branch
+ *  work: `branch` is null, and the leftover branch is `stale_branch`. A branch with its own commits,
+ *  a waiting uncommitted handoff on it, one cut after the commit, or an unknown tip stays, so a
+ *  teammate's "fix seen while testing ACME-22" on the base never replaces live work. */
 export function withBase(branchState, baseState, tip) {
   if (branchState?.state !== "review" || branchState.ambiguous || baseState?.state !== "base-pushed") return branchState;
-  if (tip?.ahead !== 0 || tip.dirty !== false) return branchState;
+  if (tip?.ahead !== 0 || tip.dirty !== false || tip.contains !== false) return branchState;
   return { ...baseState, stale_branch: branchState.branch };
+}
+
+/** What withBase needs to know about an ai/* branch, from `git` (args → trimmed output; throws on
+ *  failure): `ahead`, its commits not on origin/<base> in its local or origin copy; `dirty`, checked
+ *  out with uncommitted changes; `contains`, the pushed commit carrying the key (`pushed`, a hex sha)
+ *  is already in a copy, so the branch was cut after it. Unknown: null. */
+export function branchTip(git, base, branch, pushed) {
+  try {
+    if (!base || !branch || !/^[0-9a-f]{4,40}$/.test(pushed ?? "")) return null;
+    const dirty = git(["branch", "--show-current"]) === branch && git(["status", "--porcelain", "-z"]).length > 0;
+    let ahead = 0;
+    let contains = false;
+    for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
+      if (!git(["for-each-ref", "--format=%(refname:short)", ref])) continue;
+      ahead = Math.max(ahead, Number(git(["rev-list", "--count", `refs/remotes/origin/${base}..${ref}`, "--"])));
+      // Commits reachable from the pushed one but not from the copy: none means the copy holds it.
+      if (Number(git(["rev-list", "--count", `${ref}..${pushed}`, "--"])) === 0) contains = true;
+    }
+    return Number.isFinite(ahead) ? { ahead, dirty, contains } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The ticket's newest saved patch from base- or other-branch work, `<branch with / as ->-<KEY>.patch`
  *  in the handoffs folder (`names`: [{name, mtimeMs}]), whatever branch is checked out; ai/* branch
- *  patches (named after the branch, `ai-<KEY-n>-…`) are not this kind. `current`: made on `branch`. */
-export function handoffPatch(names, key, branch) {
+ *  patches (named after the branch, `ai-<KEY-n>-…`) are not this kind. `current`: made on `branch`;
+ *  `on_base`: made on `base` (repo.base_branch), compared the way the name writes it (`/` as `-`). */
+export function handoffPatch(names, key, branch, base) {
   if (!/^[A-Za-z0-9]+-\d+$/.test(String(key ?? ""))) return null;
   const suffix = `-${key}.patch`;
   const hit = names
@@ -629,7 +653,8 @@ export function handoffPatch(names, key, branch) {
     .sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
   if (!hit) return null;
   const prefix = hit.name.slice(0, -suffix.length);
-  return { file: hit.name, branch: prefix, current: String(branch ?? "").replaceAll("/", "-") === prefix };
+  const dashed = name => String(name ?? "").replaceAll("/", "-");
+  return { file: hit.name, branch: prefix, current: dashed(branch) === prefix, on_base: Boolean(base) && dashed(base) === prefix };
 }
 
 /** `git status --porcelain -z` → clean flag and the changed paths, exactly as on disk. */
@@ -868,21 +893,10 @@ const COMMANDS = {
       }
     };
     // Does an ai/* branch hold work of its own (withBase)? Its commits not on origin/<base>, in its
-    // local and origin copies, and uncommitted changes when it is checked out. Unknown: null.
-    const tipOf = branch => {
-      try {
-        const current = sh("git", ["branch", "--show-current"]);
-        const dirty = current === branch && raw("git", ["status", "--porcelain", "-z"]).length > 0;
-        let ahead = 0;
-        for (const ref of [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]) {
-          if (!refs(ref).length) continue;
-          ahead = Math.max(ahead, Number(sh("git", ["rev-list", "--count", `refs/remotes/origin/${base}..${ref}`, "--"])));
-        }
-        return base && Number.isFinite(ahead) ? { ahead, dirty } : null;
-      } catch {
-        return null;
-      }
-    };
+    // local and origin copies, and uncommitted changes when it is checked out. `contains`: the pushed
+    // commit carrying the key (`pushed`, a checked hex sha) is already in a copy, so the branch was cut
+    // after it. Unknown: null.
+    const tipOf = (branch, pushed) => branchTip(args => sh("git", args), base, branch, pushed);
     const logsFor = key =>
       base ? { pushed: baseLog(`refs/remotes/origin/${base}`, key), local: baseLog(`refs/heads/${base}`, key) } : { pushed: "", local: "" };
     const out = {};
@@ -901,13 +915,16 @@ const COMMANDS = {
       const logs = logsFor(key);
       const baseState = baseStateFor(base, commitsForKey(logs.pushed, key), commitsForKey(logs.local, key));
       const branchState = entries.length === 0 ? null : ticketStateFor(entries);
-      out[key] = branchState ? withBase(branchState, baseState, branchState.state === "review" ? tipOf(branchState.branch) : null) : baseState;
+      const tip = branchState?.state === "review" && baseState.state === "base-pushed" ? tipOf(branchState.branch, baseState.base.pushed) : null;
+      out[key] = branchState ? withBase(branchState, baseState, tip) : baseState;
     }
     return out;
   },
   // A ticket's saved base- or other-branch patch, so sync never globs or guesses (work §7.1).
   "handoff-patch": keys => {
-    const projectKey = tryJson("hashsmith.json")?.hashops?.project_key;
+    const config = tryJson("hashsmith.json");
+    const projectKey = config?.hashops?.project_key;
+    const base = isStr(config?.repo?.base_branch) && config.repo.base_branch.trim() ? config.repo.base_branch.trim() : null;
     if (!isStr(projectKey) || !/^[A-Za-z0-9]+$/.test(projectKey)) return { error: "no hashops.project_key in hashsmith.json" };
     // At a workspace root, each repository keeps its patches in its own folder (work, workspace mode).
     const dir = join(homedir(), ".hashsmith", "projects", projectKey, "handoffs", ...(routedRepo ? [routedRepo] : []));
@@ -917,11 +934,16 @@ const COMMANDS = {
     } catch {
       // no handoffs yet
     }
-    const branch = sh("git", ["branch", "--show-current"]);
+    let branch = null;
+    try {
+      branch = sh("git", ["branch", "--show-current"]);
+    } catch {
+      // not a git repository: no branch is checked out
+    }
     const out = {};
     for (const key of keys) {
-      const hit = handoffPatch(names, key, branch);
-      out[key] = hit ? { path: join(dir, hit.file), branch: hit.branch, current: hit.current } : null;
+      const hit = handoffPatch(names, key, branch, base);
+      out[key] = hit ? { path: join(dir, hit.file), branch: hit.branch, current: hit.current, on_base: hit.on_base } : null;
     }
     return out;
   },
@@ -988,12 +1010,19 @@ if (isMain(import.meta.url)) {
     process.stderr.write(`usage: hashsmith.mjs <${Object.keys(COMMANDS).join("|")}> [args] [--repo <name> at a workspace root]\n`);
     process.exit(2);
   }
-  let { result, args } = route(cmd, argv);
-  if (result === undefined) {
-    // Every command reads the repo's root files (hashsmith.json, .env.example, …), even from a subfolder.
-    const top = repoTop();
-    if (top !== process.cwd()) process.chdir(top);
-    result = COMMANDS[cmd](args);
+  let result;
+  try {
+    let args;
+    ({ result, args } = route(cmd, argv));
+    if (result === undefined) {
+      // Every command reads the repo's root files (hashsmith.json, .env.example, …), even from a subfolder.
+      const top = repoTop();
+      if (top !== process.cwd()) process.chdir(top);
+      result = COMMANDS[cmd](args);
+    }
+  } catch (e) {
+    // One JSON line, always: a failure the command did not expect (say, git outside a repository).
+    result = { error: `${cmd} failed: ${String(e?.message ?? e).split("\n")[0]}` };
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
   if (result?.error) process.exit(2);

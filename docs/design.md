@@ -234,7 +234,15 @@ seen while testing ACME-22" on the base never replaces live work; an open or mer
 still followed through the PR. Several `ai/*` branches (`ambiguous`) are left to the developer,
 as sync asks which is current. Revised 2026-11-10 (HSM-15 QA): a plain subject such as "Revert
 button colours" is a change, not a revert; an odd number of nested `Revert "` is a revert; a local
-base behind a pushed revert is `no-branch`, not `base-local`. Every CLI command
+base behind a pushed revert is `no-branch`, not `base-local`. Revised 2026-11-18 (HSM-15
+QA): the branch must also have been cut before that pushed commit (the commit is in neither its
+local nor its origin copy), so an older mention the branch was cut after ("chore: note for
+ACME-22", then `work` cuts the branch and the session ends before any edit) leaves it live.
+Accepted the other way round: a branch whose work was squash-merged or cherry-picked onto the
+base keeps commits of its own and stays `review`, hiding the pushed commit until the developer
+deletes it; comparing by patch-id is not worth its cost. `handoff-patch` returns `on_base`, so a
+base such as `release/2.0` (`release-2.0` in the patch name) is recognised, and the CLI prints
+any unexpected failure (git outside a repository) as one JSON error line. Every CLI command
 runs at the repo's top level, from any subfolder. Patch names replace `/` in the base branch's
 name, as they do in branch names.
 
@@ -751,7 +759,12 @@ an onboarded repo. "Never another connection" applies to Hashsmith's own work on
    trust it only while every listed repository is inside the root, holds a `.git` and has the
    same project, key and board; otherwise the session warns and every write asks. Skills follow
    `reference/workspace.md`: routing by `repo-match`, one part per repository, sync and QA over
-   every part. Conduct rule 9 covers the listed repositories.
+   every part. Conduct rule 9 covers the listed repositories. **Missing tags (2026-11-18,
+   HSM-23):** HashOps lists `create_project_tag` only to people with its project-management
+   permission, so a session may lack it while `add_project_link` is there. Without it, Hashsmith
+   never tags with a tag the project lacks: it names every missing `repo:` tag in one message,
+   asks for them to be created in HashOps, and reads `list_project_tags` again before tagging.
+   Who may create tags is HashOps's policy, not changed from here.
 3. **Lessons flowing into the shared plugin.** Feedback reports (§12) are written in general
    terms: no client names, project names, code, ids or data. The developer sees the full text
    before it is filed, and the maintainer reviews it again before anything ships.

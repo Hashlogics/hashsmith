@@ -4,6 +4,14 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.8.1 — 2026-11-18
+
+- Board tracking fix: a ticket branch cut after an older commit that mentions the ticket is no
+  longer called leftover, so sync no longer pulls that ticket into QA before its work is done.
+- sync recognises handoffs made on a base branch whose name has a slash (`release/2.0`).
+- In a workspace, when your HashOps role cannot create project tags, Hashsmith names every
+  missing `repo:` tag in one message for you to create, instead of failing on each ticket.
+
 ## 0.8.0 — 2026-11-11
 
 - One session for a product in several repositories: start Claude Code in the folder that holds

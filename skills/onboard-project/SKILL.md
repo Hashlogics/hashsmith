@@ -78,8 +78,9 @@ If `hashsmith.json` exists, this run is a **refresh**:
    and `create_task` needs at least one tag. A refresh that finds the old default (ai)
    offers the migration in `reference/config.md`, never runs it unasked; a custom name stays.
 
-The writes in this section need a project lead (or the right HashOps permission). A refusal is not
-an error to retry: note it, carry on, and list it under "ask a project lead" in Finish.
+The writes in this section need a project lead (or the right HashOps permission). A refusal, or a
+tool missing from the session's tools (HashOps lists a tool only to people allowed to use it),
+is not an error to retry: note it, carry on, and list it under "ask a project lead" in Finish.
 
 ## 4. Repo, QA and tool keys
 

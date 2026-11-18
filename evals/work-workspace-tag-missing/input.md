@@ -1,0 +1,2 @@
+Fixture: the workspace from `session-workspace-root` (a), on a scratch HashOps project where the developer lacks the project-management permission, so the session has no `create_project_tag` tool. The project has no `repo:` tags. To Do: ACME-61 and ACME-62, neither with a `repo:` tag.
+Developer: /hashsmith:work ACME-61 ACME-62, answers "acme-api and web" for ACME-61 and "web" for ACME-62, and yes to adding the tags; then says "created them".

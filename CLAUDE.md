@@ -138,7 +138,8 @@ Keep this list current: add what you defer, remove what you finish.
 - [ ] **Workspace mode (HSM-11, HSM-18 to HSM-22, 0.8.0):** built; skills follow
   `reference/workspace.md`. Run the workspace evals live before calling it done
   (`onboard-workspace`, `onboard-workspace-folder`, `session-workspace-root`,
-  `work-workspace-two-repos`, `work-workspace-untagged`, `work-repo-routing`,
-  `sync-workspace-partial`, `qa-workspace`) in a scratch workspace on a scratch HashOps project.
+  `work-workspace-two-repos`, `work-workspace-untagged`, `work-workspace-tag-missing`,
+  `work-repo-routing`, `sync-workspace-partial`, `qa-workspace`) in a scratch workspace on a
+  scratch HashOps project.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).
