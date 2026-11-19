@@ -1,0 +1,7 @@
+- [ ] Runs the CLI's `settings` and works at `detailed`, saying it comes from the personal file (`source: personal`).
+- [ ] Shows the brief with its assessment and asks whether to go on; no question and no plan before the yes.
+- [ ] Then asks both open questions (date format and inactive users) in one batch, each with options and a recommendation; nothing is listed as "Assumed".
+- [ ] Then shows the plan ending with "On yes I will:" and waits for its yes.
+- [ ] The git switch and the handoff yes are asked as at `normal`.
+- [ ] The "Plan (Hashsmith)" comment opens with the assessment, one line per check.
+- [ ] At the handoff, offers the lessons batch even though nothing was corrected.

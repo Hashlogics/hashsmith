@@ -145,5 +145,8 @@ Keep this list current: add what you defer, remove what you finish.
   with health tracking on. No HashOps tool completes a report (the lead presses Mark as
   Completed); a project-scoped tool to set items and complete the report would be a hashops PR,
   and could then replace the session pins in `hooks/health-pin.mjs`.
+- [ ] **Question level (HSM-28, 0.10.0):** run `work-questions-normal` and
+  `work-questions-detailed` live. `next`'s menu and `onboard-project` do not read the level yet;
+  `work-brief`, `work-assessment-concern` and `intake-basic` now pin `detailed`.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

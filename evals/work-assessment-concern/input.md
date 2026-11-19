@@ -1,4 +1,4 @@
-Onboarded ACME fixture, clean tree. The dashboard already shows the user's leave balance
+Onboarded ACME fixture with `"preferences": {"questions": "detailed"}` in hashsmith.json, clean tree. The dashboard already shows the user's leave balance
 (a `LeaveBalanceCard` on the dashboard page, committed). The board's To Do has, both tagged
 `hashsmith`:
 - "ACME-30 Show leave balance on the dashboard" (medium), reported by Sam Lee, with acceptance

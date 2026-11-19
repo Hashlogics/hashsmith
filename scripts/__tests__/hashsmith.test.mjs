@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   branchesForKey,
   checkConfig,
+  effectiveSettings,
   envKeyNames,
   feedbackTarget,
   gitSwitchRule,
@@ -281,6 +282,65 @@ describe("checkConfig", () => {
     const c = valid();
     delete c.changelog;
     assert.deepEqual(checkConfig(c), []);
+  });
+  it("accepts preferences.questions normal, detailed or empty, and no preferences key at all", () => {
+    for (const questions of ["normal", "detailed", ""]) {
+      const c = valid();
+      c.preferences = { questions };
+      assert.deepEqual(checkConfig(c), [], questions);
+    }
+    const c = valid();
+    c.preferences = {};
+    assert.deepEqual(checkConfig(c), []);
+  });
+  it("rejects any other question level, an unknown preference and a preferences that is no object", () => {
+    for (const [preferences, error] of [
+      [{ questions: "quiet" }, 'preferences.questions must be "normal", "detailed" or "".'],
+      [{ questions: 1 }, 'preferences.questions must be "normal", "detailed" or "".'],
+      [{ tone: "terse" }, 'Unknown preference "tone".'],
+      [["normal"], "preferences must be an object."],
+    ]) {
+      const c = valid();
+      c.preferences = preferences;
+      assert.deepEqual(checkConfig(c), [error], JSON.stringify(preferences));
+    }
+  });
+  it("accepts preferences in a workspace file", () => {
+    const { repo, qa, sonar, changelog, ...shared } = valid();
+    assert.deepEqual(checkConfig({ ...shared, repositories: { api: { path: "api" } }, preferences: { questions: "detailed" } }), []);
+  });
+});
+
+describe("effectiveSettings", () => {
+  const PERSONAL = "~/.hashsmith/settings.json";
+  it("defaults to normal when neither file sets it", () => {
+    assert.deepEqual(effectiveSettings(null, null), { questions: { value: "normal", source: "default" }, errors: [] });
+    assert.deepEqual(effectiveSettings({ version: 1 }, { preferences: {} }), { questions: { value: "normal", source: "default" }, errors: [] });
+  });
+  it("an empty value means unset, in either file", () => {
+    assert.deepEqual(effectiveSettings({ preferences: { questions: "" } }, { preferences: { questions: "" } }).questions, { value: "normal", source: "default" });
+    assert.deepEqual(effectiveSettings({ preferences: { questions: "detailed" } }, { preferences: { questions: "" } }).questions, { value: "detailed", source: "team" });
+  });
+  it("takes the team value, and the personal one over it", () => {
+    assert.deepEqual(effectiveSettings({ preferences: { questions: "detailed" } }, null).questions, { value: "detailed", source: "team" });
+    assert.deepEqual(effectiveSettings({ preferences: { questions: "detailed" } }, { preferences: { questions: "normal" } }).questions, { value: "normal", source: "personal" });
+    assert.deepEqual(effectiveSettings(null, { preferences: { questions: "detailed" } }).questions, { value: "detailed", source: "personal" });
+  });
+  it("ignores an invalid value and names it, falling back to the next source", () => {
+    const r = effectiveSettings({ preferences: { questions: "detailed" } }, { preferences: { questions: "quiet", tone: "x" } }, PERSONAL);
+    assert.deepEqual(r.questions, { value: "detailed", source: "team" });
+    assert.deepEqual(r.errors, [`${PERSONAL}: preferences.questions must be "normal", "detailed" or "".`, `${PERSONAL}: Unknown preference "tone".`]);
+    const team = effectiveSettings({ preferences: { questions: "loud" } }, null, PERSONAL);
+    assert.deepEqual(team.questions, { value: "normal", source: "default" });
+    assert.deepEqual(team.errors, ['hashsmith.json: preferences.questions must be "normal", "detailed" or "".']);
+  });
+  it("names a personal file that is not an object or holds other keys", () => {
+    assert.deepEqual(effectiveSettings(null, [1], PERSONAL).errors, [`${PERSONAL}: must be a JSON object holding preferences.`]);
+    assert.deepEqual(effectiveSettings(null, { __invalid: true }, PERSONAL).errors, [`${PERSONAL}: not valid JSON.`]);
+    assert.deepEqual(effectiveSettings(null, { preferences: { questions: "detailed" }, hashops: {} }, PERSONAL), {
+      questions: { value: "detailed", source: "personal" },
+      errors: [`${PERSONAL}: Unknown key "hashops" (only preferences).`],
+    });
   });
 });
 
@@ -993,6 +1053,28 @@ describe("CLI", () => {
     const conf = spawnSync(process.execPath, [CLI, "check-config"], { cwd: join(dir, "sub"), encoding: "utf8" });
     assert.doesNotMatch(conf.stdout, /not found/, conf.stdout);
   });
+  it("settings prints each preference with its source, the personal file over the team's", () => {
+    const dir = fixtureRepo();
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const run = () => {
+      const r = spawnSync(process.execPath, [CLI, "settings"], { cwd: dir, encoding: "utf8", env: { ...process.env, HOME: home } });
+      return { status: r.status, out: JSON.parse(r.stdout), raw: r.stdout + r.stderr };
+    };
+    let r = run();
+    assert.equal(r.status, 0, r.raw);
+    assert.deepEqual(r.out.questions, { value: "normal", source: "default" });
+    assert.equal(r.out.personal_file, join(home, ".hashsmith", "settings.json"));
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify({ version: 1, preferences: { questions: "detailed" } }));
+    assert.deepEqual(run().out.questions, { value: "detailed", source: "team" });
+    mkdirSync(join(home, ".hashsmith"));
+    writeFileSync(join(home, ".hashsmith", "settings.json"), JSON.stringify({ preferences: { questions: "normal" } }));
+    assert.deepEqual(run().out, { questions: { value: "normal", source: "personal" }, personal_file: join(home, ".hashsmith", "settings.json"), errors: [] });
+    writeFileSync(join(home, ".hashsmith", "settings.json"), "{ not json");
+    r = run();
+    assert.equal(r.status, 0, "a broken personal file never stops a skill");
+    assert.deepEqual(r.out.questions, { value: "detailed", source: "team" });
+    assert.match(r.out.errors[0], /settings\.json: not valid JSON\.$/);
+  });
   it("an unknown command exits 2 with usage", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });
     assert.equal(r.status, 2);
@@ -1026,6 +1108,16 @@ describe("CLI in a workspace", () => {
     const bad = run(root, ["check-config"]);
     assert.equal(bad.status, 1, bad.raw);
     assert.deepEqual(bad.out.errors, ["apps/web/hashsmith.json: hashops.board_id differs from the workspace's."]);
+  });
+  it("settings runs at the root with the workspace's value, and in a repository with --repo", () => {
+    const { root, web } = fixtureWorkspace();
+    writeFileSync(join(root, "hashsmith.json"), JSON.stringify({ version: 1, hashops, preferences: { questions: "detailed" }, repositories: { "acme-api": { path: "acme-api" }, web: { path: "apps/web" } } }));
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const at = args => JSON.parse(spawnSync(process.execPath, [CLI, ...args], { cwd: root, encoding: "utf8", env: { ...process.env, HOME: home } }).stdout);
+    assert.deepEqual(at(["settings"]).questions, { value: "detailed", source: "team" });
+    assert.deepEqual(at(["settings", "--repo", "web"]).questions, { value: "normal", source: "default" });
+    writeFileSync(join(web, "hashsmith.json"), JSON.stringify({ version: 1, hashops, repo: { base_branch: "main" }, preferences: { questions: "detailed" } }));
+    assert.deepEqual(at(["settings", "--repo", "web"]).questions, { value: "detailed", source: "team" });
   });
   it("check-config rejects a listed folder that is not a Git repository, or a symlink out of the workspace", () => {
     const { root } = fixtureWorkspace();

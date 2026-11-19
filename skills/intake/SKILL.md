@@ -17,7 +17,8 @@ session context. At a workspace root (session start says so), also follow `refer
 
 1. Run the CLI's `check-config`. Not ok, or no `hashsmith.json`: propose `/hashsmith:onboard-project`
    and stop. Read `hashops.project_id`, `hashops.board_id`, `hashops.lists.todo`, `hashops.ai_tag`
-   and `intake.processed_meetings` from the file; never ask for them.
+   and `intake.processed_meetings` from the file; never ask for them. Read the question level
+   from the CLI's `settings` (`questions.value`; conduct 3).
 2. Run `/hashsmith:sync`, so the board you check for duplicates is current.
 
 ## 2. Load the sources
@@ -64,10 +65,12 @@ for Out of scope or Open questions, and its size for the draft's size note.
 
 ## 6. Questions
 
-Collect every question the sources and the code could not answer, and ask them **once**, in one
-batch: each with options and a recommended default with one line of why. Skip questions whose
-answer is already in the sources, the code or `hashsmith.json`. What stays unresolved goes on the
-ticket under Open questions.
+Collect every question the sources and the code could not answer. Skip questions whose answer is
+already in the sources, the code or `hashsmith.json`. At `detailed`, ask them **once**, in one
+batch: each with options and a recommended default with one line of why. At `normal`, a
+question with a recommended default takes it: the draft it shapes lists it under **Assumed**
+(after Open questions); only questions with no safe default are asked, with the drafts (§7), in
+the same message. What stays unresolved goes on the ticket under Open questions.
 
 ## 7. Drafts
 
@@ -84,7 +87,8 @@ Write each ticket with `reference/ticket-template.md`: plain text only, no Markd
   line of why.
 - **Size note:** the investigator's S / M / L.
 
-Show all drafts in full, numbered. The developer may accept all, edit some, or drop some. Apply
+Show all drafts in full, numbered, with any **Assumed** lines; at both levels the drafts still
+need a yes before `create_task`. The developer may accept all, edit some, or drop some. Apply
 edits and show the changed drafts again before creating.
 
 ## 8. Create

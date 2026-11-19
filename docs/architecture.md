@@ -112,7 +112,7 @@ Three properties are load-bearing (see `CLAUDE.md`, "Rules"):
 `node scripts/hashsmith.mjs <command>` is run from the repo root and prints one JSON line. At a
 workspace root (a `hashsmith.json` with `repositories`), `--repo <name>` runs any command inside
 that listed repository; without it only `check-config` (the whole workspace), `repo-match`,
-`lists-before-todo` and `feedback-target` run there. Before onboarding, in a plain folder of
+`lists-before-todo`, `feedback-target`, `git-switch` and `settings` run there. Before onboarding, in a plain folder of
 repositories, `--repo <folder>` names a direct child repository. `handoff-patch --repo` reads that
 repository's own handoff folder.
 
@@ -130,6 +130,7 @@ repository's own handoff folder.
 | `handoff-patch KEY…` | per key: the newest saved base- or other-branch patch under `~/.hashsmith/projects/<project_key>/handoffs/` (never an `ai/*` branch's), its `branch` (`/` as `-`), `current` (made on the checked-out branch) and `on_base` (made on `repo.base_branch`), or null | `sync` |
 | `changelog` | the changelog `mode` and `path` to use (stored, else detected from the repo's root files, `package.json` and workflows; tool and file names only), the `generator`, `ask` (nothing stored or found) and `changed` (write it to `hashsmith.json`) | `onboard-project`, `work` |
 | `changelog-check TYPE` (the handoff patch on stdin) | in `write` mode: `needs_entry` and `heading` for the commit type, `missing_entry`, and `problems` (ticket keys, file names or code in an entry, a release heading added or a section heading removed in the changelog, a changed `version` in the root `package.json`) | `work` |
+| `settings` | each preference (`questions`) with its `value` and `source` (`personal` from `~/.hashsmith/settings.json`, `team` from `hashsmith.json`, or `default`), `personal_file`, and `errors` naming invalid values, which are ignored | `work`, `intake`, `qa` |
 | `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
 
 Link URLs, project names and list names come from HashOps, where any project lead can set one, so

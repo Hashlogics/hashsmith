@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.9.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.10.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`, `health-check`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -96,6 +96,15 @@ says so.
 If the project's `.claude/settings.json` denies `git switch`, move `Bash(git switch *)` from deny to
 ask (keep `git checkout *` denied), so Hashsmith can create its `ai/*` branches. Onboarding tells
 you when that is needed.
+
+### How much Hashsmith asks
+
+`"preferences": {"questions": "normal"}` in `hashsmith.json` (the default) lets Hashsmith take each
+recommended answer and list it under **Assumed** next to the one yes it asks for: when a ticket's
+assessment is OK, `work` shows the brief and the plan together. `"detailed"` asks every question batch. To choose for
+yourself only, put the same block in `~/.hashsmith/settings.json`; the CLI's `settings` shows which
+value applies and where it comes from. Both levels still ask before every HashOps write, every
+branch switch and on every assessment Concern or Stop.
 
 ### One product, several repositories
 

@@ -23,6 +23,7 @@ a token or an email (`config-guard.mjs` blocks them). Validate after every write
   "sonar": { "project_key": "hashlogics_hashops" },
   "sentry": { "project": "…" },
   "changelog": { "mode": "write", "path": "CHANGELOG.md" },  // write | commits | off (reference/changelog.md)
+  "preferences": { "questions": "normal" },  // normal | detailed | "" (normal); a developer's ~/.hashsmith/settings.json overrides it
   "intake": {
     "processed_meetings": [
       { "id": "…", "on": "2026-10-27", "tickets": ["HOPS-120", "HOPS-121"] },
@@ -55,6 +56,21 @@ depend on them.
   meeting is not processed twice. Every ticket also names its source (§7), and `intake` checks
   the board for existing tickets from the same source. A teammate whose config is behind still
   does not create duplicates.
+
+## Preferences
+
+How the team works with Hashsmith, not a cache: never looked up, never asked at onboarding.
+`""` or missing means the default. A developer overrides it for themselves, key by key, in
+`~/.hashsmith/settings.json` (`{"preferences": {"questions": "detailed"}}`), outside every repo;
+Hashsmith never writes that file. The CLI's `settings` prints each effective value and its source
+(`personal`, `team` or `default`); an invalid value is ignored and named in its `errors`.
+
+- **`questions`:** `normal` (default) or `detailed`. `normal`: a question with a recommended
+  default takes it and is listed under **Assumed** in the message that asks for the next yes;
+  only questions with no safe default are asked. `detailed`: every question batch is asked, as
+  before 0.10.0. Both levels ask before every HashOps write and git switch, on every assessment
+  Concern or Stop, for security-critical code and before acting on a real environment (conduct
+  3, 4 and 8, and its paragraph on real environments).
 
 ## Learned keys
 
@@ -112,6 +128,7 @@ JWTs, `sk_`, `ghp_`, `xox[abp]-` and `-----BEGIN` patterns; learned key names co
 | `qa.mode` | `code` when the project has no web UI (no dev server, nothing to open in a browser; `base_url` stays `""`), else `browser`; asked when unclear |
 | `sonar.project_key` | `sonar-project.properties`, else `hashlogics_<repo>` |
 | `sentry.project` | the Sentry tools' project list, only when the session has them |
+| `preferences.*` | never looked up: the team's choice; a developer's own in `~/.hashsmith/settings.json` |
 | `changelog.mode`, `path` | the CLI's `changelog`: a tool that builds it from commits → `commits`; else a root `CHANGELOG.md` / `CHANGES.md` / `HISTORY.md` → `write`; else one question, where anything but a clear no is `write` (`reference/changelog.md`). A stored `write` turns stale once a generator appears; `off` always stands |
 
 ## Migrating `ai_tag` to `hashsmith`

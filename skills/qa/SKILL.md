@@ -13,7 +13,7 @@ against its code and tests instead (§4b).
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools; the browser is the
 `mcp__plugin_hashsmith_playwright__*` tools. "The CLI" is the `Hashsmith CLI` line in your session
 context. Read `hashops.*`, `qa.base_url` and `qa.mode` from `hashsmith.json` (`check-config`
-first). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
+first), and the question level from the CLI's `settings` (`questions.value`; conduct 3). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Preconditions
 
@@ -26,7 +26,10 @@ first). At a workspace root (session start says so), also follow `reference/work
   present; if not, stop: add the Playwright MCP (`/mcp`) and run `npx playwright install
   chromium` once.
 - Run `/hashsmith:sync` so the QA list is current. Pick the tickets: the ones the developer named,
-  else every ticket in QA tagged `hashops.ai_tag` (ask which, one batch, when there are several).
+  else every ticket in QA tagged `hashops.ai_tag` (at `detailed`, ask which, one batch, when there
+  are several; at `normal`, take them all and list them under **Assumed** in the next message).
+  At both levels the yes before running browser steps (step 2.1), every branch switch and the
+  verdict (§6) are still asked.
 
 ## 2. Per ticket: get ready
 

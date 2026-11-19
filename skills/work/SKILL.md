@@ -12,7 +12,8 @@ developer reviews the unstaged change.
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools. "The CLI" is the
 `Hashsmith CLI` line in your session context. Read `hashops.*`, `repo.base_branch`,
 `repo.branch_policy` and `qa.base_url` from `hashsmith.json` (run the CLI's `check-config` first; invalid or missing →
-propose `/hashsmith:onboard-project` and stop). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
+propose `/hashsmith:onboard-project` and stop), and the question level from the CLI's `settings`
+(`questions.value`: `normal` or `detailed`; conduct 3). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Choose the tickets
 
@@ -57,19 +58,25 @@ For each ticket or group:
    - **Assessment** (`reference/ticket-assessment.md`; not on a resume, again on a QA bounce):
      `Assessment: OK`, or one line per concern. A **Stop** is the brief's first line instead.
 
-   One line per field, bullets beyond that, never a paragraph over three lines. Ask whether to go
-   on, except after a Stop for a broken project rule (Allowed): the ticket is skipped, as the
-   assessment file says. After any Stop, no step 4 questions and no plan come before an explicit
+   One line per field, bullets beyond that, never a paragraph over three lines. At `detailed`,
+   ask whether to go on; at `normal`, with `Assessment: OK`, steps 3–5 are one message with one
+   yes (the brief, then the plan). At both levels a Concern or Stop ends the message at the brief:
+   its decision is asked, never assumed, and after a Stop for a broken project rule (Allowed)
+   nothing is asked: the ticket is skipped, as the assessment file says.
+   After any Stop, no step 4 questions and no plan come before an explicit
    go-ahead. A no or a correction changes the brief (and re-runs the assessment), then show it
    again. On a Concern or Stop, also offer to post the assessment on the ticket (after a yes).
-4. Ask what is still unclear, in one batch with options and a recommendation.
+4. What is still unclear. At `detailed`, ask it in one batch with options and a recommendation.
+   At `normal`, a question with a recommended default takes it and goes under **Assumed** in the
+   plan; only questions with no safe default are asked, in the plan's message, and its yes waits
+   for their answers.
 5. Write the plan: the acceptance criteria restated, the files to change with one line each, the
    tests to add, the checks that will prove it, and for UI tickets that `/hashsmith:design` runs.
    A ticket tagged for other repositories too (the assessment's `repo-match`) covers this one's
    part only; the plan lists the other parts, each done from its own repository's session (at a
    workspace root, every part is done here: `reference/workspace.md`).
-   End it with "On yes I will:" and the branch (§3), adding the `ai_tag` tag, the move to In
-   Progress and posting this plan. Show it and wait for a yes. A no or an edit changes the plan,
+   List any **Assumed** answers (step 4). End it with "On yes I will:" and the branch (§3),
+   adding the `ai_tag` tag, the move to In Progress and posting this plan. Show it and wait for a yes. A no or an edit changes the plan,
    not the ticket.
 
 ## 3. Branch
@@ -114,7 +121,8 @@ I will:" names the branch the work goes on.
 1. Read the ticket's current tags (from `get_task`); if `ai_tag` is missing, `update_task` with
    `tags: [...current, ai_tag]` (it replaces all tags; never drop the existing ones).
 2. `move_task` to `lists.in_progress`.
-3. `comment_on_task`: "Plan (Hashsmith)", then the plan from step 2, as plain text
+3. `comment_on_task`: "Plan (Hashsmith)", then the assessment with one line per check (its "On
+   the ticket" section), then the plan from step 2, as plain text
    (`reference/ticket-template.md` rules).
 
 These three need no extra yes: the plan's yes covers them. Say what you did in one line.
@@ -191,7 +199,8 @@ The ticket stays in Review.
 ## 9. Lessons and config
 
 At the handoff, offer in one batch to record any corrections the developer made during the
-session (conduct 11): a rule for this project's `CLAUDE.md`, or a rule for every project, which
-goes to `/hashsmith:feedback` (one ticket per lesson, after its own yes). Add a
+session (conduct 11); at `normal`, only when the developer corrected something. A lesson is a
+rule for this project's `CLAUDE.md`, or a rule for every project, which goes to
+`/hashsmith:feedback` (one ticket per lesson, after its own yes). Add a
 `learned` key to `hashsmith.json` only under the rules in `reference/config.md`, announce it in one
 line, and run `check-config` after writing.

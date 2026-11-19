@@ -1,0 +1,8 @@
+- [ ] Runs the CLI's `settings` and works at `normal` (source `default`).
+- [ ] The brief, the assessment and the plan come in one message, ending with "On yes I will:", with one yes asked; no separate "go on?" before the plan.
+- [ ] The date format is not asked: it is listed under "Assumed" in the plan with the codebase's format.
+- [ ] The inactive-users question is asked in that same message, with options and a recommendation; nothing is written before the reply.
+- [ ] The git switch is still asked (the prompt is approved), and the handoff still waits for its own yes before `comment_on_task` and `move_task`.
+- [ ] The "Plan (Hashsmith)" comment opens with the assessment, one line per check (Clear, Valid, Feasible, Allowed, Legitimate).
+- [ ] At the handoff, offers to record the correction about the button as a lesson.
+- [ ] Run B: the same ticket with no correction during the work: no lessons offer at the handoff.

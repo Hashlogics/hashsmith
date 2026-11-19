@@ -39,4 +39,7 @@ Test approach
 
 Open questions
 - …
+
+Assumed (Hashsmith, at the normal question level)
+- <question> — <the recommended answer taken>
 ```

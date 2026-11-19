@@ -17,8 +17,8 @@ own steps and adds what its section here says. Every listed repository keeps its
 - **Claude Code's permissions** in this session are the root's `.claude/settings.json`, not each
   repository's: a deny a repository keeps for itself does not apply here. CLI `git-switch` at the
   root reports the rule that does.
-- **CLI.** `check-config`, `repo-match`, `lists-before-todo`, `feedback-target` and `git-switch`
-  run at the root as they are. Every other command takes `--repo <name>` and then works exactly
+- **CLI.** `check-config`, `repo-match`, `lists-before-todo`, `feedback-target`, `git-switch` and
+  `settings` (the root file's preferences) run at the root as they are. Every other command takes `--repo <name>` and then works exactly
   as in a single repository, on that repository's files and settings.
 - **Git** runs as `git -C <path> …` (for example `git -C <path> status`). Files are read and
   edited under `<path>/`. A repository's own checks run in its folder, by the commands its own

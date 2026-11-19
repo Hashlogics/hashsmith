@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.10.0 — 2026-11-19
+
+- Hashsmith asks less by default: when a ticket's assessment is OK, `work` shows the brief and the
+  plan together and takes one yes, with recommended answers listed under "Assumed". For the old
+  step-by-step flow, set `"preferences": {"questions": "detailed"}` in `~/.hashsmith/settings.json`.
+- Every plan posted on a ticket now opens with the full assessment, one line per check.
+
 ## 0.9.0 — 2026-11-19
 
 - New `/hashsmith:health-check` (project leads): fills in the project's HashOps health report. It

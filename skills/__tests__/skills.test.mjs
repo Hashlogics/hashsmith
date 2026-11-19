@@ -125,6 +125,22 @@ describe("skills and agents", () => {
       assert.match(text, new RegExp(`\\*\\*${word}\\b`), `reference/ticket-assessment.md must define ${word}`);
     assert.match(readFileSync(join(root, "skills", "work", "SKILL.md"), "utf8"), /reference\/ticket-assessment\.md/);
   });
+  it("the question level is read from the CLI's settings and never lifts a safety ask", () => {
+    const conduct = readFileSync(join(root, "reference", "conduct.md"), "utf8");
+    assert.match(conduct, /question level \(CLI `settings`\)/, "conduct 3 must name the level and where it comes from");
+    assert.match(conduct, /Never assumed at\s+either level: rule 4's yes, a git switch, an assessment Concern or Stop, rule 8, and anything\s+that acts on a real environment\./);
+    assert.match(conduct, /at the `normal` question level take the recommended one/, "conduct 2 must name the level too");
+    for (const skill of ["work", "intake", "qa"]) {
+      const text = readFileSync(join(root, "skills", skill, "SKILL.md"), "utf8");
+      assert.match(text, /CLI's `settings`/, `${skill} must read the level from the CLI's settings`);
+      assert.match(text, /\*\*Assumed\*\*/, `${skill} must list assumed answers`);
+      assert.match(text, /`detailed`/, `${skill} must keep the detailed path`);
+    }
+    const work = readFileSync(join(root, "skills", "work", "SKILL.md"), "utf8");
+    assert.match(work, /one line\s+per check/, "the Plan comment must open with the assessment, one line per check");
+    assert.match(work.split(/^## 9\./m)[1] ?? "", /at `normal`, only when the developer corrected something/);
+    assert.match(readFileSync(join(root, "skills", "intake", "SKILL.md"), "utf8"), /still\s+need a yes before `create_task`/);
+  });
   it("code-investigator is read-only: no Bash, so text from a source cannot run commands", () => {
     const fm = frontmatter(readFileSync(join(root, "agents", "code-investigator.md"), "utf8"));
     assert.doesNotMatch(fm.tools ?? "", /Bash/);

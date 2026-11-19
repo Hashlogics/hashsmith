@@ -188,14 +188,17 @@ export function gitSwitchRule(settings) {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const TICKET = /^[A-Z0-9]+-\d+$/;
-const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "learned"];
+const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "learned", "preferences"];
 // A workspace file holds what its repositories share; each repository's own file holds the rest.
-const WORKSPACE_TOP = ["version", "hashops", "repositories", "intake", "learned"];
+const WORKSPACE_TOP = ["version", "hashops", "repositories", "intake", "learned", "preferences"];
 const REPO_ONLY = ["repo", "qa", "sonar", "sentry", "changelog"];
 const CHANGELOG_MODES = ["write", "commits", "off"];
 const QA_MODES = ["browser", "code", ""];
 const BRANCH_POLICIES = ["managed", "current", "confirm", ""];
 const LISTS = ["todo", "in_progress", "review", "qa", "done"];
+// How the developer works with Hashsmith (design §5): the team's value in hashsmith.json, a
+// developer's own in ~/.hashsmith/settings.json. "" means unset; the first value is the default.
+const PREFERENCES = { questions: ["normal", "detailed"] };
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string";
 
@@ -293,6 +296,8 @@ function sharedErrors(c) {
       });
   }
 
+  if (c.preferences !== undefined) e.push(...preferencesErrors(c.preferences));
+
   if (c.learned !== undefined) {
     if (!isObj(c.learned)) e.push("learned must be an object.");
     else
@@ -303,6 +308,45 @@ function sharedErrors(c) {
       }
   }
   return e;
+}
+
+const preferenceError = k => `preferences.${k} must be ${[...PREFERENCES[k], ""].map(v => JSON.stringify(v)).join(", ").replace(/, ([^,]*)$/, " or $1")}.`;
+
+/** A preferences block's errors, in its own key order; [] means valid. */
+function preferencesErrors(p) {
+  if (!isObj(p)) return ["preferences must be an object."];
+  return Object.keys(p).flatMap(k => {
+    if (!PREFERENCES[k]) return [`Unknown preference "${k}".`];
+    return p[k] === "" || PREFERENCES[k].includes(p[k]) ? [] : [preferenceError(k)];
+  });
+}
+
+/** Each preference's effective value and its source: the personal file's (~/.hashsmith/settings.json,
+ *  `{preferences: {…}}`) over the team's (hashsmith.json), key by key, else the default. An empty or
+ *  invalid value counts as unset; invalid ones are named in `errors`, so a broken file never stops a
+ *  skill. `team` and `personal` are parsed files (null when missing). */
+export function effectiveSettings(team, personal, personalLabel = "~/.hashsmith/settings.json") {
+  const errors = [];
+  const usable = (file, label) => {
+    const p = isObj(file) ? file.preferences : undefined;
+    if (p === undefined) return {};
+    const bad = preferencesErrors(p);
+    errors.push(...bad.map(m => `${label}: ${m}`));
+    if (!isObj(p)) return {};
+    return Object.fromEntries(Object.entries(p).filter(([k, v]) => PREFERENCES[k]?.includes(v)));
+  };
+  const fromTeam = usable(team, "hashsmith.json");
+  let fromPersonal = {};
+  if (personal?.__invalid) errors.push(`${personalLabel}: not valid JSON.`);
+  else if (personal !== null && personal !== undefined && !isObj(personal)) errors.push(`${personalLabel}: must be a JSON object holding preferences.`);
+  else if (isObj(personal)) {
+    fromPersonal = usable(personal, personalLabel);
+    for (const k of Object.keys(personal)) if (k !== "preferences") errors.push(`${personalLabel}: Unknown key "${k}" (only preferences).`);
+  }
+  const result = {};
+  for (const [k, values] of Object.entries(PREFERENCES))
+    result[k] = k in fromPersonal ? { value: fromPersonal[k], source: "personal" } : k in fromTeam ? { value: fromTeam[k], source: "team" } : { value: values[0], source: "default" };
+  return { ...result, errors };
 }
 
 /** A valid workspace file against what is on disk for each repository (children: name →
@@ -873,6 +917,11 @@ const COMMANDS = {
     const errors = checkConfig(c);
     return errors.length ? { ok: false, errors } : { ok: true };
   },
+  // The developer's own file sits beside handoffs and pins, outside every repository.
+  settings: () => {
+    const personal = join(homedir(), ".hashsmith", "settings.json");
+    return { ...effectiveSettings(tryJson("hashsmith.json"), tryJson(personal), personal), personal_file: personal };
+  },
   tree: () => ({ ...treeState(raw("git", ["status", "--porcelain", "-z"])), branch: sh("git", ["branch", "--show-current"]) }),
   "ticket-state": keys => {
     // Remote branches count too: a teammate's handoff branch exists here only as origin/ai/… .
@@ -997,8 +1046,9 @@ function route(cmd, argv) {
     routedRepo = flag.repo;
   } else if (workspace) {
     if (WORKSPACE_COMMANDS[cmd]) return { result: WORKSPACE_COMMANDS[cmd](flag.args, root, workspace) };
-    // git-switch reads the root's own .claude settings: the ones a session here runs under.
-    if (cmd === "lists-before-todo" || cmd === "feedback-target" || cmd === "git-switch") return { result: COMMANDS[cmd](flag.args) };
+    // git-switch reads the root's own .claude settings: the ones a session here runs under; settings,
+    // the root file's preferences.
+    if (cmd === "lists-before-todo" || cmd === "feedback-target" || cmd === "git-switch" || cmd === "settings") return { result: COMMANDS[cmd](flag.args) };
     return { result: { error: "This is a workspace root: pass --repo <name>.", repositories: Object.keys(workspace.repositories ?? {}) } };
   }
   return { args: flag.args };
