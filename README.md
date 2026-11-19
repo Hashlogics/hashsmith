@@ -20,8 +20,8 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.10.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
-`feedback`, `health-check`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
+**Status: 0.11.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+`feedback`, `health-check`, `config`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
 
@@ -106,6 +106,26 @@ yourself only, put the same block in `~/.hashsmith/settings.json`; the CLI's `se
 value applies and where it comes from. Both levels still ask before every HashOps write, every
 branch switch and on every assessment Concern or Stop.
 
+### Every setting: `/hashsmith:config`
+
+`/hashsmith:config` shows every `hashsmith.json` key with its allowed values, its default, this
+project's value and where that comes from (`team`, `personal`, `default`, or `unset`: looked up
+when needed), plus the learned keys. It changes nothing.
+
+**Editor support.** `hashsmith.json`'s JSON Schema ships with the plugin. The plugin's folder
+changes with each version, so keep a copy and refresh it after an update:
+
+```
+node <Hashsmith CLI> config-help --schema > ~/.hashsmith/hashsmith.schema.json
+```
+
+`/hashsmith:config` prints this command with the real `<Hashsmith CLI>` path. In VS Code, add to
+your user settings (with your home folder's absolute path):
+
+```json
+"json.schemas": [{ "fileMatch": ["/hashsmith.json"], "url": "file:///Users/you/.hashsmith/hashsmith.schema.json" }]
+```
+
 ### One product, several repositories
 
 When one product (one HashOps project and board) has its code in several repositories, for
@@ -147,6 +167,7 @@ always just say what you want instead.
 | `/hashsmith:feedback [what went wrong]` | Files one ticket per point on the Hashsmith board's Backlog, with you as the reporter, after your yes. Written in general terms (no client, project or code specifics), with a concrete before/after edit to the skill. Works in any repo |
 | `/hashsmith:health-check` | Fills in the project's HashOps health report (leads only). It audits the repo against each checklist item with evidence, asks you what the code can't show, shows the draft and projected score, and marks the items after your yes. You press **Mark as Completed** in HashOps |
 | `/hashsmith:onboard-project` | Set up or refresh the project's `hashsmith.json` |
+| `/hashsmith:config` | Shows every `hashsmith.json` setting: allowed values, default, this project's value and where it comes from, and how to set your own. Read-only |
 
 ### A ticket's life
 

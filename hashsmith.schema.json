@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "hashsmith.json",
+  "description": "Hashsmith's per-project config. Generated from scripts/config-keys.mjs (npm run schema); the CLI's check-config is the full check.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "Config shape version; Hashsmith migrates older shapes on read.",
+      "enum": [
+        1
+      ]
+    },
+    "hashops": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "description": "The HashOps project this repository's tickets live in.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "project_key": {
+          "description": "The task-code prefix (ACME-12); the scope hook checks every task code against it.",
+          "type": "string",
+          "pattern": "^[A-Z0-9]+$"
+        },
+        "board_id": {
+          "description": "The board Hashsmith reads and moves tickets on.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "lists": {
+          "type": "object",
+          "properties": {
+            "todo": {
+              "description": "The board's To Do list.",
+              "type": "string",
+              "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "in_progress": {
+              "description": "The board's In Progress list.",
+              "type": "string",
+              "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "review": {
+              "description": "The board's Review list.",
+              "type": "string",
+              "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "qa": {
+              "description": "The board's QA list.",
+              "type": "string",
+              "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "done": {
+              "description": "The board's Done list.",
+              "type": "string",
+              "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            }
+          },
+          "required": [
+            "todo",
+            "in_progress",
+            "review",
+            "qa",
+            "done"
+          ],
+          "additionalProperties": false
+        },
+        "ai_tag": {
+          "description": "The tag on every ticket Hashsmith works; sync and qa follow only tagged tickets.",
+          "type": "string",
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "project_id",
+        "project_key",
+        "board_id",
+        "lists",
+        "ai_tag"
+      ]
+    },
+    "repo": {
+      "type": "object",
+      "properties": {
+        "base_branch": {
+          "description": "What ai/* branches are cut from and PRs target.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "branch_policy": {
+          "description": "How work and qa pick a branch: a new ai/* branch, the checked-out one, or ask before each switch.",
+          "enum": [
+            "managed",
+            "current",
+            "confirm",
+            ""
+          ],
+          "default": "managed"
+        }
+      },
+      "required": [
+        "base_branch"
+      ]
+    },
+    "qa": {
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "description": "The local app QA and design screenshots open; never a hosted one.",
+          "type": "string",
+          "pattern": "^$|^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/\\S*)?$"
+        },
+        "mode": {
+          "description": "How qa verifies: in the browser, or by code and tests for a project with no web UI.",
+          "enum": [
+            "browser",
+            "code",
+            ""
+          ]
+        }
+      },
+      "required": [
+        "base_url"
+      ]
+    },
+    "sonar": {
+      "type": "object",
+      "properties": {
+        "project_key": {
+          "description": "The Sonar project self-review reads issues from, when Sonar tools are present.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_key"
+      ]
+    },
+    "sentry": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The Sentry project for issue details.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project"
+      ]
+    },
+    "changelog": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "description": "How the changelog is kept: Hashsmith writes entries, a tool builds it from commits, or off.",
+          "enum": [
+            "write",
+            "commits",
+            "off"
+          ]
+        },
+        "path": {
+          "description": "The changelog file Hashsmith writes entries to in write mode.",
+          "type": "string",
+          "pattern": "^[^/\\\\]+\\.[mM][dD]$"
+        }
+      },
+      "required": [
+        "mode",
+        "path"
+      ]
+    },
+    "intake": {
+      "type": "object",
+      "properties": {
+        "processed_meetings": {
+          "description": "Meetings intake already turned into tickets, so none is processed twice.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "on",
+              "tickets"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "on": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "tickets": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]+-\\d+$"
+                }
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "questions": {
+          "description": "How much Hashsmith asks: normal takes recommended answers and lists them under Assumed; detailed asks every question batch.",
+          "enum": [
+            "normal",
+            "detailed",
+            ""
+          ],
+          "default": "normal"
+        }
+      },
+      "additionalProperties": false
+    },
+    "repositories": {
+      "type": "object",
+      "properties": {},
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "description": "Each repository of the workspace and its folder; its settings live in its own hashsmith.json.",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "learned": {
+      "type": "object",
+      "properties": {},
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "description": "Project facts Hashsmith saved so it need not ask again, each with why and how to look it up again.",
+        "type": "object",
+        "required": [
+          "value",
+          "why",
+          "source",
+          "added"
+        ],
+        "properties": {
+          "why": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "added": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "version",
+    "hashops"
+  ],
+  "additionalProperties": false
+}

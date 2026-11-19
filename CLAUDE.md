@@ -46,6 +46,9 @@ Node 22 or newer. No npm install is needed; the plugin has no dependencies.
 - `scripts/hashsmith.mjs`: the Hashsmith CLI, the deterministic parts of the skills (repo slugs and
   matches, env key names, git-switch rule, config check, tree and ticket state). Tests in
   `scripts/__tests__/`. Session start gives skills its absolute path.
+- `scripts/config-keys.mjs`: the one table of `hashsmith.json` keys; check-config, `config-help` and
+  `hashsmith.schema.json` (`npm run schema`) all come from it, and tests fail when they drift. A
+  new key starts there.
 - `skills/<name>/SKILL.md`: shipped skills. `skills/__tests__/skills.test.mjs` checks frontmatter,
   the 250-line budget, that every `reference/…`, `references/…` and agent they name exists, that
   every git command they name passes git-guard, and that no literal id slips in.
@@ -148,5 +151,7 @@ Keep this list current: add what you defer, remove what you finish.
 - [ ] **Question level (HSM-28, 0.10.0):** run `work-questions-normal` and
   `work-questions-detailed` live. `next`'s menu and `onboard-project` do not read the level yet;
   `work-brief`, `work-assessment-concern` and `intake-basic` now pin `detailed`.
+- [ ] **Settings table (HSM-30, 0.11.0):** run `config-show` live. `next`'s menu does not offer
+  `/hashsmith:config`; onboarding could show its table at the end instead of its own summary.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).

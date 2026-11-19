@@ -12,7 +12,7 @@ const read = rel => readFileSync(new URL(`../${rel}`, import.meta.url), "utf8");
 const SEEN = join(homedir(), ".hashsmith", "last_seen_version");
 const CLI = fileURLToPath(new URL("../scripts/hashsmith.mjs", import.meta.url));
 const WORKSPACE_GUIDE = fileURLToPath(new URL("../reference/workspace.md", import.meta.url));
-const CLI_COMMANDS = "repo-slug, project-candidates, lists-before-todo, repo-match, env-keys, git-switch, check-config, tree, ticket-state, handoff-patch, feedback-target, changelog, changelog-check, settings";
+const CLI_COMMANDS = "repo-slug, project-candidates, lists-before-todo, repo-match, env-keys, git-switch, check-config, tree, ticket-state, handoff-patch, feedback-target, changelog, changelog-check, settings, config-help";
 
 const newer = (a, b) => {
   const [x, y] = [a, b].map(v => v.split(".").map(Number));
@@ -64,7 +64,7 @@ function workspaceStart(dir, ws, version, seenFile) {
   );
   if (problems.length)
     parts.push(`This workspace's config does not check out: ${problems.join("; ")}. Every HashOps write asks until it does. Before any other Hashsmith work, run the CLI's check-config here and propose /hashsmith:onboard-project to fix it.`);
-  parts.push(`Hashsmith CLI: node "${CLI}" <command> (${CLI_COMMANDS}). Run it from this folder: check-config, repo-match, lists-before-todo, feedback-target, settings (this folder's preferences) and git-switch (this folder's own settings, which this session runs under) run as they are; every other command takes --repo <name>, a key of repositories. Run git as git -C <that repository's path>.`);
+  parts.push(`Hashsmith CLI: node "${CLI}" <command> (${CLI_COMMANDS}). Run it from this folder: check-config, repo-match, lists-before-todo, feedback-target, settings (this folder's preferences), config-help (this folder's keys) and git-switch (this folder's own settings, which this session runs under) run as they are; every other command takes --repo <name>, a key of repositories. Run git as git -C <that repository's path>.`);
   const banner = `Hashsmith ${version}${key ? ` · ${key}` : ""} · workspace${problems.length ? " (config does not check out)" : ""}`;
   return finish(parts, banner, version, seenFile);
 }

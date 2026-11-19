@@ -1,0 +1,9 @@
+- [ ] Runs the CLI's `config-help` once; no other command, and no `check-config` of its own.
+- [ ] A status line says the file is a repository file and valid.
+- [ ] One table per section (hashops, repo, qa, sonar, sentry, changelog, intake, preferences, learned), with the columns Key, This project, Source, Allowed, Default, What it does.
+- [ ] `branch_policy` shows `managed` with source `default`; `base_url` shows source `unset` and how it is looked up; ids are shortened.
+- [ ] `questions` is marked "(team or personal)" and shows `normal` from `personal`, over the team's `detailed`.
+- [ ] The learned keys table shows `qa_login_route` with its value and why.
+- [ ] It says how to set a personal value (the personal file's path and a `{"preferences": …}` example) and how to change a team value, and shows the `config-help --schema` command with the CLI's real path.
+- [ ] Nothing is written: `git status` is unchanged and no HashOps tool is called.
+- [ ] Run B: the status line names `hashops.board_id` as missing and proposes `/hashsmith:onboard-project`; the table is still shown.

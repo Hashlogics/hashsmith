@@ -18,11 +18,14 @@
 //   feedback-target      the Hashsmith feedback board, list and tags, and the plugin version (exit 1 when invalid)
 //   changelog            how this project keeps its changelog: stored in hashsmith.json, else detected (names only)
 //   changelog-check TYPE the commit type's changelog heading, and what the patch on stdin does to the changelog
+//   config-help          every hashsmith.json key (scripts/config-keys.mjs) with this project's value and its source;
+//                        --schema prints hashsmith.json's JSON Schema
 //
 // At a workspace root (a hashsmith.json with `repositories`, docs/plans/2026-11-05-workspace-repositories.md),
 // `--repo <name>` runs any command inside that listed repository, on its own hashsmith.json. Without it
 // only check-config (the whole workspace), repo-match (a ticket's tags → repository names),
-// lists-before-todo, feedback-target and git-switch (the root's own settings) run there; the rest
+// lists-before-todo, feedback-target, git-switch (the root's own settings), settings and config-help
+// (the root file's) run there; the rest
 // fail and list the names. Before onboarding, in a plain folder, --repo names a child repository.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -30,6 +33,7 @@ import { homedir } from "node:os";
 import { basename, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain, relativeFolder, REPO_NAME } from "../hooks/lib.mjs";
+import { CONFIG_KEYS, configSchema } from "./config-keys.mjs";
 
 // Hosts whose repos are always owner/repo, so anything after that is a web page within the repo.
 const TWO_SEGMENT = new Set(["github.com", "bitbucket.org"]);
@@ -185,20 +189,33 @@ export function gitSwitchRule(settings) {
   return "none";
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const TICKET = /^[A-Z0-9]+-\d+$/;
-const TOP = ["version", "hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "learned", "preferences"];
+// Key names and allowed values come from the one table (scripts/config-keys.mjs, HSM-30).
+const keyRow = key => CONFIG_KEYS.find(r => r.key === key);
+// Formats too, so hashsmith.schema.json and check-config can never disagree on one.
+const pattern = key => new RegExp(keyRow(key).schema.pattern);
+const UUID = pattern("hashops.project_id");
+const LIST_ID = pattern("hashops.lists.todo"); // a UUID or ""
+const PROJECT_KEY = pattern("hashops.project_key");
+const BASE_URL = pattern("qa.base_url"); // "" or a local URL
+const CHANGELOG_PATH = pattern("changelog.path");
+const MEETING = keyRow("intake.processed_meetings").schema.items.properties;
+const DAY = new RegExp(MEETING.on.pattern);
+const TICKET = new RegExp(MEETING.tickets.items.pattern);
+const LEARNED_NAME = keyRow("learned.<name>").names;
+const allowed = key => (keyRow(key).empty ? [...keyRow(key).values, ""] : keyRow(key).values);
+const topKeys = file => [...new Set(CONFIG_KEYS.filter(r => r.files.includes(file)).map(r => r.key.split(".")[0]))];
+const TOP = topKeys("repository");
 // A workspace file holds what its repositories share; each repository's own file holds the rest.
-const WORKSPACE_TOP = ["version", "hashops", "repositories", "intake", "learned", "preferences"];
-const REPO_ONLY = ["repo", "qa", "sonar", "sentry", "changelog"];
-const CHANGELOG_MODES = ["write", "commits", "off"];
-const QA_MODES = ["browser", "code", ""];
-const BRANCH_POLICIES = ["managed", "current", "confirm", ""];
-const LISTS = ["todo", "in_progress", "review", "qa", "done"];
+const WORKSPACE_TOP = topKeys("workspace");
+const REPO_ONLY = TOP.filter(k => !WORKSPACE_TOP.includes(k));
+const CHANGELOG_MODES = allowed("changelog.mode");
+const QA_MODES = allowed("qa.mode");
+const BRANCH_POLICIES = allowed("repo.branch_policy");
+const LISTS = CONFIG_KEYS.filter(r => r.key.startsWith("hashops.lists.")).map(r => r.key.split(".")[2]);
 // How the developer works with Hashsmith (design §5): the team's value in hashsmith.json, a
-// developer's own in ~/.hashsmith/settings.json. "" means unset; the first value is the default.
-const PREFERENCES = { questions: ["normal", "detailed"] };
+// developer's own in ~/.hashsmith/settings.json. "" means unset, and the table's default applies.
+const PREFERENCE_ROWS = CONFIG_KEYS.filter(r => r.scope === "personal");
+const PREFERENCES = Object.fromEntries(PREFERENCE_ROWS.map(r => [r.key.split(".")[1], r.values]));
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string";
 
@@ -217,14 +234,14 @@ export function checkConfig(c) {
   else {
     if (!UUID.test(h.project_id ?? "")) e.push("hashops.project_id must be a UUID.");
     if (!UUID.test(h.board_id ?? "")) e.push("hashops.board_id must be a UUID.");
-    if (!/^[A-Z0-9]+$/.test(h.project_key ?? "")) e.push("hashops.project_key must be upper-case letters and digits (e.g. HOPS).");
+    if (!PROJECT_KEY.test(h.project_key ?? "")) e.push("hashops.project_key must be upper-case letters and digits (e.g. HOPS).");
     if (!isObj(h.lists)) e.push("hashops.lists is required.");
     else {
       const keys = Object.keys(h.lists);
       for (const k of LISTS) if (!keys.includes(k)) e.push(`hashops.lists.${k} is missing (use "" to look it up).`);
       for (const k of keys)
         if (!LISTS.includes(k)) e.push(`hashops.lists.${k} is not a list key (${LISTS.join(", ")}).`);
-        else if (!(h.lists[k] === "" || UUID.test(h.lists[k]))) e.push(`hashops.lists.${k} must be a UUID or "".`);
+        else if (!LIST_ID.test(h.lists[k])) e.push(`hashops.lists.${k} must be a UUID or "".`);
     }
     if (!isStr(h.ai_tag) || !h.ai_tag.trim()) e.push("hashops.ai_tag must be a non-empty string.");
   }
@@ -262,7 +279,7 @@ function repoSettingsErrors(c) {
   if (isObj(c.repo) && "branch_policy" in c.repo && !BRANCH_POLICIES.includes(c.repo.branch_policy))
     e.push('repo.branch_policy must be "managed", "current", "confirm" or "" (managed).');
   // QA and design screenshots run only against a local app (design §6 qa).
-  if (c.qa !== undefined && !(isObj(c.qa) && isStr(c.qa.base_url) && (c.qa.base_url === "" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/\S*)?$/.test(c.qa.base_url))))
+  if (c.qa !== undefined && !(isObj(c.qa) && isStr(c.qa.base_url) && BASE_URL.test(c.qa.base_url)))
     e.push('qa.base_url must be "" or a local URL (http://localhost:<port> or http://127.0.0.1:<port>).');
   // How qa verifies: in the browser, or by code and tests for a project with no web UI; "" asks.
   if (isObj(c.qa) && "mode" in c.qa && !QA_MODES.includes(c.qa.mode))
@@ -272,7 +289,7 @@ function repoSettingsErrors(c) {
   // A Markdown file at the repo root only: entries are written there, and sync leaves it out of
   // its working-tree match, so it must never be a project file or leave the repo.
   const log = c.changelog;
-  if (log !== undefined && !(isObj(log) && CHANGELOG_MODES.includes(log.mode) && isStr(log.path) && /^[^/\\]+\.md$/i.test(log.path)))
+  if (log !== undefined && !(isObj(log) && CHANGELOG_MODES.includes(log.mode) && isStr(log.path) && CHANGELOG_PATH.test(log.path)))
     e.push('changelog must be {mode: "write" | "commits" | "off", path: a .md file at the repo root}.');
   return e;
 }
@@ -302,7 +319,7 @@ function sharedErrors(c) {
     if (!isObj(c.learned)) e.push("learned must be an object.");
     else
       for (const [k, v] of Object.entries(c.learned)) {
-        if (!/^[a-z][a-z0-9_]*$/.test(k)) e.push(`learned key "${k}" must be snake_case.`);
+        if (!LEARNED_NAME.test(k)) e.push(`learned key "${k}" must be snake_case.`);
         else if (!(isObj(v) && "value" in v && isStr(v.why) && isStr(v.source) && DAY.test(v.added ?? "")))
           e.push(`learned.${k} must be {value, why, source, added: YYYY-MM-DD}.`);
       }
@@ -344,9 +361,50 @@ export function effectiveSettings(team, personal, personalLabel = "~/.hashsmith/
     for (const k of Object.keys(personal)) if (k !== "preferences") errors.push(`${personalLabel}: Unknown key "${k}" (only preferences).`);
   }
   const result = {};
-  for (const [k, values] of Object.entries(PREFERENCES))
-    result[k] = k in fromPersonal ? { value: fromPersonal[k], source: "personal" } : k in fromTeam ? { value: fromTeam[k], source: "team" } : { value: values[0], source: "default" };
+  for (const r of PREFERENCE_ROWS) {
+    const k = r.key.split(".")[1];
+    result[k] = k in fromPersonal ? { value: fromPersonal[k], source: "personal" } : k in fromTeam ? { value: fromTeam[k], source: "team" } : { value: r.default, source: "default" };
+  }
   return { ...result, errors };
+}
+
+/** The stored value at a table key; a `<name>` segment gives a map of name → the rest. */
+function storedAt(obj, parts) {
+  if (!parts.length) return obj;
+  if (!isObj(obj)) return undefined;
+  const [part, ...rest] = parts;
+  if (part !== "<name>") return storedAt(obj[part], rest);
+  const out = Object.fromEntries(Object.entries(obj).map(([name, v]) => [name, storedAt(v, rest)]).filter(([, v]) => v !== undefined));
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** What config-help prints (HSM-30): every key of this kind of file from the table, with this
+ *  project's value and its source (team: hashsmith.json; personal: the developer's own file;
+ *  default; unset: looked up or asked when needed), the learned keys, check-config's verdict and
+ *  the essential keys (version, hashops) that are missing. `config` and `personal` are parsed files (null when missing). */
+export function configHelp(config, personal, personalLabel = "~/.hashsmith/settings.json") {
+  const found = config !== null && config !== undefined && !config.__invalid;
+  const c = found && isObj(config) ? config : {};
+  const file = "repositories" in c ? "workspace" : "repository";
+  const settings = effectiveSettings(found ? config : null, personal, personalLabel);
+  const missing = [];
+  const keys = CONFIG_KEYS.filter(r => r.files.includes(file)).map(r => {
+    const stored = storedAt(c, r.key.split("."));
+    const blank = stored === undefined || stored === "";
+    if (r.essential && r.required && (stored === undefined || (stored === "" && !r.empty))) missing.push(r.key);
+    let at;
+    if (r.scope === "personal") at = settings[r.key.split(".")[1]];
+    else if (!blank) at = { value: r.key === "learned.<name>" ? Object.keys(stored) : stored, source: "team" };
+    else if (r.default !== null) at = { value: r.default, source: "default" };
+    else at = { value: stored ?? null, source: "unset" };
+    const { key, values, default: def, unset, scope, about } = r;
+    return { key, section: key.split(".")[0], values, empty: !!r.empty, default: def, when_unset: unset ?? null, scope, about, ...at };
+  });
+  let errors;
+  if (!found) errors = [config?.__invalid ? "hashsmith.json is not valid JSON." : "hashsmith.json not found."];
+  else errors = checkConfig(config);
+  const learned = isObj(c.learned) ? Object.entries(c.learned).map(([key, v]) => ({ ...(isObj(v) ? v : { value: v }), key })) : [];
+  return { found, file, ok: errors.length === 0, errors, missing, keys, learned, settings_errors: settings.errors };
 }
 
 /** A valid workspace file against what is on disk for each repository (children: name →
@@ -917,6 +975,12 @@ const COMMANDS = {
     const errors = checkConfig(c);
     return errors.length ? { ok: false, errors } : { ok: true };
   },
+  // Read-only, for /hashsmith:config: every key, this project's values and where they come from.
+  "config-help": args => {
+    if (args.includes("--schema")) return configSchema();
+    const personal = join(homedir(), ".hashsmith", "settings.json");
+    return { ...configHelp(tryJson("hashsmith.json"), tryJson(personal), personal), personal_file: personal };
+  },
   // The developer's own file sits beside handoffs and pins, outside every repository.
   settings: () => {
     const personal = join(homedir(), ".hashsmith", "settings.json");
@@ -1046,9 +1110,9 @@ function route(cmd, argv) {
     routedRepo = flag.repo;
   } else if (workspace) {
     if (WORKSPACE_COMMANDS[cmd]) return { result: WORKSPACE_COMMANDS[cmd](flag.args, root, workspace) };
-    // git-switch reads the root's own .claude settings: the ones a session here runs under; settings,
-    // the root file's preferences.
-    if (cmd === "lists-before-todo" || cmd === "feedback-target" || cmd === "git-switch" || cmd === "settings") return { result: COMMANDS[cmd](flag.args) };
+    // git-switch reads the root's own .claude settings: the ones a session here runs under; settings
+    // and config-help, the root file's preferences and keys.
+    if (["lists-before-todo", "feedback-target", "git-switch", "settings", "config-help"].includes(cmd)) return { result: COMMANDS[cmd](flag.args) };
     return { result: { error: "This is a workspace root: pass --repo <name>.", repositories: Object.keys(workspace.repositories ?? {}) } };
   }
   return { args: flag.args };

@@ -344,6 +344,18 @@ yet).
   real environment (conduct 3, 4, 8 and its paragraph on real environments). Whatever the level, the "Plan (Hashsmith)" comment opens
   with the assessment, one line per check, so the ticket shows how it was validated.
 
+### Every key in one table (decided 2026-11-19, HSM-30)
+
+No command showed which keys exist, their allowed values or what a project uses; the only list was
+`TOP` and the checks in `checkConfig`. Now `scripts/config-keys.mjs` holds one row per key: its
+allowed values, whether `""` means unset, its default or how it is looked up, team or personal
+scope, which file holds it (a repository's, a workspace root's) and one line on what it does.
+`check-config` takes its key names and allowed values from the table (the finer checks, such as
+id and URL formats, stay in `checkConfig`, and tests fail when the two disagree). The CLI's
+`config-help` prints the table with this project's values and their source, and
+`hashsmith.schema.json`, generated from it by `npm run schema`, ships with the plugin for editors.
+The plugin's folder changes with each version and the repo is private, so editors use a copy:
+`config-help --schema` prints it, and the README shows the VS Code mapping.
 ### Learned keys
 
 Hashsmith may add its own keys under `learned`, so configs differ between projects while the core
@@ -677,6 +689,18 @@ unfinished one.
 checklist page, which waits for every required item; HashOps completes open reports at the end of
 the period. HashOps's checklist template listing returns no items, so the skill does not use it.
 A tool to complete a report would be a hashops PR first.
+
+### `config`
+
+**Use when:** the developer asks which `hashsmith.json` settings exist, what this project uses or
+how to set their own (HSM-30). Read-only, by decision: it changes nothing, and points to editing
+`hashsmith.json` (team values), the personal file (preferences) or `onboard-project` (ids).
+
+It runs the CLI's `config-help` and shows one table per section: key, this project's value, its
+source (`team`, `personal`, `default`, `unset`), allowed values, default and what the key does;
+then the learned keys with their why, how to set a personal value, and the schema command for
+editors. When an essential key (`version`, `hashops.*`) is missing or the file is invalid, it proposes `onboard-project`. It
+works in any repository, onboarded or not, and at a workspace root on the root's file.
 
 ## 7. Ticket template
 

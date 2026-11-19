@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.11.0 — 2026-11-19
+
+- New `/hashsmith:config`: every `hashsmith.json` setting in one table, with its allowed values,
+  its default, this project's value and where it comes from (team, your own file, default), plus
+  the learned keys. Read-only; it proposes `/hashsmith:onboard-project` when something is missing.
+- Editors can check `hashsmith.json` against its JSON Schema (README "Editor support").
+
 ## 0.10.0 — 2026-11-19
 
 - Hashsmith asks less by default: when a ticket's assessment is OK, `work` shows the brief and the

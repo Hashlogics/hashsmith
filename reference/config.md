@@ -41,6 +41,14 @@ a token or an email (`config-guard.mjs` blocks them). Validate after every write
 }
 ```
 
+## Every key: one table
+
+`scripts/config-keys.mjs` lists every key above with its allowed values, default (or how it is
+looked up), scope (team, or personal for preferences) and one line on what it does. `check-config`
+takes its key names and allowed values from that table, the CLI's `config-help` prints it with this
+project's values and their source, `/hashsmith:config` shows it, and `hashsmith.schema.json` is
+generated from it. A new key gets its row there and its description here, in the same change.
+
 ## Core keys
 
 The keys above `learned` are **core**. They are defined in `reference/config.md`, and the skills

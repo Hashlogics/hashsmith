@@ -1,0 +1,2 @@
+Onboarded ACME fixture, clean tree. `hashsmith.json` has the core keys, `repo.base_branch: "main"` and no `branch_policy`, `qa.base_url: ""`, `changelog: {mode: "write", path: "CHANGELOG.md"}`, `preferences: {questions: "detailed"}`, and one learned key, `qa_login_route` (`/login`, why "QA starts every session here"). `~/.hashsmith/settings.json` holds `{"preferences": {"questions": "normal"}}`.
+Developer: /hashsmith:config. Run B: the same with `hashops.board_id` deleted from `hashsmith.json`.
