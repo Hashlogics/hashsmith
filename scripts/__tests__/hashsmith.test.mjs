@@ -336,7 +336,7 @@ describe("effectiveSettings", () => {
   });
   it("names a personal file that is not an object or holds other keys", () => {
     assert.deepEqual(effectiveSettings(null, [1], PERSONAL).errors, [`${PERSONAL}: must be a JSON object holding preferences.`]);
-    assert.deepEqual(effectiveSettings(null, { __invalid: true }, PERSONAL).errors, [`${PERSONAL}: not valid JSON.`]);
+    assert.deepEqual(effectiveSettings(null, { __invalid: true }, PERSONAL).errors, [`${PERSONAL} is not valid JSON.`]);
     assert.deepEqual(effectiveSettings(null, { preferences: { questions: "detailed" }, hashops: {} }, PERSONAL), {
       questions: { value: "detailed", source: "personal" },
       errors: [`${PERSONAL}: Unknown key "hashops" (only preferences).`],
@@ -1073,7 +1073,7 @@ describe("CLI", () => {
     r = run();
     assert.equal(r.status, 0, "a broken personal file never stops a skill");
     assert.deepEqual(r.out.questions, { value: "detailed", source: "team" });
-    assert.match(r.out.errors[0], /settings\.json: not valid JSON\.$/);
+    assert.match(r.out.errors[0], /settings\.json is not valid JSON at line 1, column 3\.$/);
   });
   it("an unknown command exits 2 with usage", () => {
     const r = spawnSync(process.execPath, [CLI, "nope"], { encoding: "utf8" });

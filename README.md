@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.11.0** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.11.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`, `health-check`, `config`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together

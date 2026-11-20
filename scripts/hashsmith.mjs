@@ -33,7 +33,7 @@ import { homedir } from "node:os";
 import { basename, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain, relativeFolder, REPO_NAME } from "../hooks/lib.mjs";
-import { CONFIG_KEYS, configSchema } from "./config-keys.mjs";
+import { CONFIG_KEYS, configSchema, KNOWN_KEYS } from "./config-keys.mjs";
 
 // Hosts whose repos are always owner/repo, so anything after that is a web page within the repo.
 const TWO_SEGMENT = new Set(["github.com", "bitbucket.org"]);
@@ -218,15 +218,125 @@ const PREFERENCE_ROWS = CONFIG_KEYS.filter(r => r.scope === "personal");
 const PREFERENCES = Object.fromEntries(PREFERENCE_ROWS.map(r => [r.key.split(".")[1], r.values]));
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string";
+// A name from the file, in an error: quoted, escaped and short, so it reads as data.
+// Invisible format characters (bidi overrides, zero-width) are escaped too, so a name reads as it is.
+const named = s =>
+  JSON.stringify(s.length > 60 ? `${s.slice(0, 57)}…` : s).replace(/\p{Cf}/gu, ch => `\\u${ch.codePointAt(0).toString(16).padStart(4, "0")}`);
+const andList = xs => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : `${xs[0]}`);
+
+/** Edits between two names, a swap of neighbours counting as one (optimal string alignment). */
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  return d[a.length][b.length];
+}
+
+/** The candidate a misspelled name most likely meant (HSM-38), or null. Case aside, a name of
+ *  two characters must match exactly, up to seven may be one edit off, longer ones two. */
+export function closestKey(name, candidates) {
+  const a = String(name).toLowerCase();
+  let best = null;
+  let bestDistance = Infinity;
+  for (const c of candidates) {
+    const b = c.toLowerCase();
+    const limit = b.length <= 2 ? 0 : b.length <= 7 ? 1 : 2;
+    if (Math.abs(a.length - b.length) > limit) continue;
+    const d = editDistance(a, b);
+    if (d <= limit && d < bestDistance) [best, bestDistance] = [c, d];
+  }
+  return best;
+}
+
+const didYouMean = near => (near ? `; did you mean ${named(near)}?` : ".");
+
+/** Keys the table does not know, in every section with no message of its own (the file itself,
+ *  preferences and repositories' entries have theirs), each with the absent key it most likely
+ *  meant (`meant`, a full path) when one is close. */
+const OWN_MESSAGE = new Set(["", "preferences", "repositories.<name>"]);
+function unknownKeys(c, tops) {
+  const out = [];
+  const visit = (v, path, label) => {
+    if (Array.isArray(v) && KNOWN_KEYS[`${path}[]`]) v.forEach((item, i) => visit(item, `${path}[]`, `${label}[${i}]`));
+    const known = KNOWN_KEYS[path];
+    if (!known || !isObj(v)) return;
+    for (const [k, x] of Object.entries(v)) {
+      const at = label ? `${label}.${k}` : k;
+      if (known.includes("<name>")) visit(x, `${path}.<name>`, at);
+      else if (known.includes(k) && (path || tops.includes(k))) visit(x, path ? `${path}.${k}` : k, at);
+      else if (!OWN_MESSAGE.has(path)) {
+        const near = closestKey(k, known.filter(n => !(n in v)));
+        out.push({ message: `Unknown key ${named(at)}${didYouMean(near && `${label}.${near}`)}`, meant: near && `${label}.${near}` });
+      }
+    }
+  };
+  visit(c, "", "");
+  return out;
+}
+
+// An error is about a key when its subject (the first word) is that key, or the entry holding it
+// (a learned entry's or a meeting's shape); errors about its other keys still show.
+const isAbout = (message, key) => {
+  const subject = message.split(" ")[0];
+  return subject === key || subject === key.replace(/(\.[^.[\]]+|\[\d+\])$/, "");
+};
+
+const parses = text => {
+  try {
+    JSON.parse(text);
+    return null;
+  } catch (err) {
+    return String(err?.message ?? err);
+  }
+};
+const lineAt = (text, i) => text.slice(0, i).split("\n").length;
+const CONFLICT_MARKER = /^(<{7}|={7}|>{7}|\|{7})(\s|$)/;
+
+/** Where a file stops being JSON (HSM-38), as the rest of a sentence about it ("is not valid JSON
+ *  at line 3, column 5"), or null when it parses. Merge-conflict markers are named by line. Never
+ *  quotes the file's text: the engine's message can hold a piece of it, so only its position is
+ *  used; when it gives none, the first bad character is found by parsing ever longer prefixes. */
+export function jsonProblem(text) {
+  const message = parses(text);
+  if (message === null) return null;
+  const markers = text.split("\n").flatMap((l, i) => (CONFLICT_MARKER.test(l) ? [i + 1] : []));
+  if (markers.length) return `has merge-conflict markers at ${markers.length > 1 ? "lines" : "line"} ${andList(markers)}: resolve the conflict`;
+  if (!text.trim()) return "is empty";
+  let index = Number(/at position (\d+)/.exec(message)?.[1] ?? NaN);
+  if (Number.isNaN(index) && /^Unexpected token/.test(message)) {
+    // The shortest prefix that fails the same way ends at the bad character.
+    const bad = n => /^Unexpected token/.test(parses(text.slice(0, n)) ?? "");
+    let [lo, hi] = [1, text.length];
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (bad(mid)) hi = mid;
+      else lo = mid + 1;
+    }
+    index = lo - 1;
+  }
+  if (!Number.isNaN(index)) return `is not valid JSON at line ${lineAt(text, index)}, column ${index - text.lastIndexOf("\n", index - 1)}`;
+  if (/end of JSON input/.test(message)) return `is not valid JSON: it ends early, at line ${lineAt(text, text.trimEnd().length - 1)} (an unclosed { or [?)`;
+  return "is not valid JSON";
+}
 
 /** hashsmith.json shape errors (design §5, reference/config.md); [] means valid. */
 export function checkConfig(c) {
   if (!isObj(c)) return ["hashsmith.json must be a JSON object."];
   const workspace = "repositories" in c;
-  const e = [];
+  const tops = workspace ? WORKSPACE_TOP : TOP;
+  const unknown = [];
   for (const k of Object.keys(c))
-    if (workspace && REPO_ONLY.includes(k)) e.push(`${k} belongs in each repository's own hashsmith.json, not the workspace file.`);
-    else if (!(workspace ? WORKSPACE_TOP : TOP).includes(k)) e.push(`Unknown top-level key "${k}".`);
+    if (workspace && REPO_ONLY.includes(k)) unknown.push({ message: `${k} belongs in each repository's own hashsmith.json, not the workspace file.` });
+    else if (!tops.includes(k)) {
+      const near = closestKey(k, tops.filter(t => !(t in c)));
+      unknown.push({ message: `Unknown top-level key ${named(k)}${didYouMean(near)}`, meant: near });
+    }
+  unknown.push(...unknownKeys(c, tops));
+  const e = [];
   if (c.version !== 1) e.push("version must be 1.");
 
   const h = c.hashops;
@@ -239,9 +349,7 @@ export function checkConfig(c) {
     else {
       const keys = Object.keys(h.lists);
       for (const k of LISTS) if (!keys.includes(k)) e.push(`hashops.lists.${k} is missing (use "" to look it up).`);
-      for (const k of keys)
-        if (!LISTS.includes(k)) e.push(`hashops.lists.${k} is not a list key (${LISTS.join(", ")}).`);
-        else if (!LIST_ID.test(h.lists[k])) e.push(`hashops.lists.${k} must be a UUID or "".`);
+      for (const k of keys) if (LISTS.includes(k) && !LIST_ID.test(h.lists[k])) e.push(`hashops.lists.${k} must be a UUID or "".`);
     }
     if (!isStr(h.ai_tag) || !h.ai_tag.trim()) e.push("hashops.ai_tag must be a non-empty string.");
   }
@@ -249,7 +357,9 @@ export function checkConfig(c) {
   if (workspace) e.push(...repositoriesErrors(c.repositories));
   else e.push(...repoSettingsErrors(c));
   e.push(...sharedErrors(c));
-  return e;
+  // A misspelled key gives one error: its suggestion, not also "missing" for the key it meant.
+  const meant = unknown.map(u => u.meant).filter(Boolean);
+  return [...unknown.map(u => u.message), ...e.filter(m => !meant.some(k => isAbout(m, k)))];
 }
 
 // A relative folder inside the workspace on paper (hooks/lib.mjs); symlinks are checked on disk.
@@ -261,7 +371,7 @@ function repositoriesErrors(r) {
   const e = [];
   const seen = new Map();
   for (const [name, v] of Object.entries(r)) {
-    if (!REPO_NAME.test(name)) e.push(`repositories key "${name}" must be letters, digits, ".", "_" or "-", starting with a letter or digit.`);
+    if (!REPO_NAME.test(name)) e.push(`repositories key ${named(name)} must be letters, digits, ".", "_" or "-", starting with a letter or digit.`);
     else if (!isObj(v) || Object.keys(v).some(k => k !== "path")) e.push(`repositories.${name} must be {path}; its settings live in its own hashsmith.json.`);
     else if (!relativePath(v.path)) e.push(`repositories.${name}.path must be a relative folder inside the workspace, like "acme-api".`);
     else if (seen.has(v.path)) e.push(`repositories.${name}.path is also ${seen.get(v.path)}'s.`);
@@ -289,8 +399,11 @@ function repoSettingsErrors(c) {
   // A Markdown file at the repo root only: entries are written there, and sync leaves it out of
   // its working-tree match, so it must never be a project file or leave the repo.
   const log = c.changelog;
-  if (log !== undefined && !(isObj(log) && CHANGELOG_MODES.includes(log.mode) && isStr(log.path) && CHANGELOG_PATH.test(log.path)))
-    e.push('changelog must be {mode: "write" | "commits" | "off", path: a .md file at the repo root}.');
+  if (log !== undefined && !isObj(log)) e.push('changelog must be {mode: "write" | "commits" | "off", path: a .md file at the repo root}.');
+  else if (log !== undefined) {
+    if (!CHANGELOG_MODES.includes(log.mode)) e.push('changelog.mode must be "write", "commits" or "off".');
+    if (!(isStr(log.path) && CHANGELOG_PATH.test(log.path))) e.push('changelog.path must be a .md file at the repo root, like "CHANGELOG.md".');
+  }
   return e;
 }
 
@@ -319,7 +432,7 @@ function sharedErrors(c) {
     if (!isObj(c.learned)) e.push("learned must be an object.");
     else
       for (const [k, v] of Object.entries(c.learned)) {
-        if (!LEARNED_NAME.test(k)) e.push(`learned key "${k}" must be snake_case.`);
+        if (!LEARNED_NAME.test(k)) e.push(`learned key ${named(k)} must be snake_case.`);
         else if (!(isObj(v) && "value" in v && isStr(v.why) && isStr(v.source) && DAY.test(v.added ?? "")))
           e.push(`learned.${k} must be {value, why, source, added: YYYY-MM-DD}.`);
       }
@@ -333,7 +446,7 @@ const preferenceError = k => `preferences.${k} must be ${[...PREFERENCES[k], ""]
 function preferencesErrors(p) {
   if (!isObj(p)) return ["preferences must be an object."];
   return Object.keys(p).flatMap(k => {
-    if (!PREFERENCES[k]) return [`Unknown preference "${k}".`];
+    if (!PREFERENCES[k]) return [`Unknown preference ${named(k)}${didYouMean(closestKey(k, Object.keys(PREFERENCES).filter(n => !(n in p))))}`];
     return p[k] === "" || PREFERENCES[k].includes(p[k]) ? [] : [preferenceError(k)];
   });
 }
@@ -354,11 +467,11 @@ export function effectiveSettings(team, personal, personalLabel = "~/.hashsmith/
   };
   const fromTeam = usable(team, "hashsmith.json");
   let fromPersonal = {};
-  if (personal?.__invalid) errors.push(`${personalLabel}: not valid JSON.`);
+  if (personal?.__invalid) errors.push(`${personalLabel} ${personal.problem ?? "is not valid JSON"}.`);
   else if (personal !== null && personal !== undefined && !isObj(personal)) errors.push(`${personalLabel}: must be a JSON object holding preferences.`);
   else if (isObj(personal)) {
     fromPersonal = usable(personal, personalLabel);
-    for (const k of Object.keys(personal)) if (k !== "preferences") errors.push(`${personalLabel}: Unknown key "${k}" (only preferences).`);
+    for (const k of Object.keys(personal)) if (k !== "preferences") errors.push(`${personalLabel}: Unknown key ${named(k)} (only preferences).`);
   }
   const result = {};
   for (const r of PREFERENCE_ROWS) {
@@ -401,7 +514,7 @@ export function configHelp(config, personal, personalLabel = "~/.hashsmith/setti
     return { key, section: key.split(".")[0], values, empty: !!r.empty, default: def, when_unset: unset ?? null, scope, about, ...at };
   });
   let errors;
-  if (!found) errors = [config?.__invalid ? "hashsmith.json is not valid JSON." : "hashsmith.json not found."];
+  if (!found) errors = [config?.__invalid ? `hashsmith.json ${config.problem ?? "is not valid JSON"}.` : "hashsmith.json not found."];
   else errors = checkConfig(config);
   const learned = isObj(c.learned) ? Object.entries(c.learned).map(([key, v]) => ({ ...(isObj(v) ? v : { value: v }), key })) : [];
   return { found, file, ok: errors.length === 0, errors, missing, keys, learned, settings_errors: settings.errors };
@@ -423,7 +536,7 @@ export function checkWorkspace(c, children) {
     else if (twin) e.push(`repositories.${name}.path is the same repository as ${twin}'s.`);
     else if (!child.git) e.push(`repositories.${name}: ${path} is not a Git repository.`);
     else if (child.config === null || child.config === undefined) e.push(`${file} not found: onboard that repository first.`);
-    else if (child.config.__invalid) e.push(`${file} is not valid JSON.`);
+    else if (child.config.__invalid) e.push(`${file} ${child.config.problem ?? "is not valid JSON"}.`);
     else if (isObj(child.config) && "repositories" in child.config) e.push(`${file} is a workspace file; workspaces do not nest.`);
     else {
       const own = checkConfig(child.config);
@@ -788,7 +901,7 @@ const tryJson = path => {
   try {
     return JSON.parse(text);
   } catch {
-    return { __invalid: true };
+    return { __invalid: true, problem: jsonProblem(text) };
   }
 };
 // The repo's top folder, so a command run from a subfolder still reads the root's files.
@@ -967,7 +1080,7 @@ const COMMANDS = {
   "check-config": () => {
     const c = tryJson("hashsmith.json");
     if (c === null) return { ok: false, errors: ["hashsmith.json not found at the repo root."] };
-    if (c.__invalid) return { ok: false, errors: ["hashsmith.json is not valid JSON."] };
+    if (c.__invalid) return { ok: false, errors: [`hashsmith.json ${c.problem ?? "is not valid JSON"}.`] };
     // A workspace file is checked only at its own root (WORKSPACE_COMMANDS); in a repository the
     // hooks treat it as broken, so it must not pass here.
     if (isObj(c) && "repositories" in c)

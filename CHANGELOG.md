@@ -4,6 +4,13 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.11.1 — 2026-11-20
+
+- `check-config` now catches a misspelled `hashsmith.json` key in any section and says which key
+  you meant (`repo.branch_polcy` → `repo.branch_policy`); before, it passed and the setting did
+  nothing. A file with a typo that passed until now will fail until it is fixed.
+- A broken `hashsmith.json` is reported with its line and column, or its merge-conflict lines.
+
 ## 0.11.0 — 2026-11-19
 
 - New `/hashsmith:config`: every `hashsmith.json` setting in one table, with its allowed values,

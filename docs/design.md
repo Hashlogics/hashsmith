@@ -356,6 +356,14 @@ id and URL formats, stay in `checkConfig`, and tests fail when the two disagree)
 `hashsmith.schema.json`, generated from it by `npm run schema`, ships with the plugin for editors.
 The plugin's folder changes with each version and the repo is private, so editors use a copy:
 `config-help --schema` prints it, and the README shows the VS Code mapping.
+
+Unknown keys (decided 2026-11-20, HSM-38): a misspelled key inside a section (`repo.branch_polcy`)
+used to pass, so the setting silently did nothing. Every section, learned entry and processed
+meeting now rejects names the table does not hold (the schema closes them too), with the closest
+absent key as a suggestion; a misspelled required key gives that one error, not a second
+"missing" one. A file that does not parse is reported by line and column, or by the lines of its
+merge-conflict markers, never by quoting its text.
+
 ### Learned keys
 
 Hashsmith may add its own keys under `learned`, so configs differ between projects while the core

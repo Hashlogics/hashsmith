@@ -78,7 +78,8 @@
         "board_id",
         "lists",
         "ai_tag"
-      ]
+      ],
+      "additionalProperties": false
     },
     "repo": {
       "type": "object",
@@ -101,7 +102,8 @@
       },
       "required": [
         "base_branch"
-      ]
+      ],
+      "additionalProperties": false
     },
     "qa": {
       "type": "object",
@@ -122,7 +124,8 @@
       },
       "required": [
         "base_url"
-      ]
+      ],
+      "additionalProperties": false
     },
     "sonar": {
       "type": "object",
@@ -134,7 +137,8 @@
       },
       "required": [
         "project_key"
-      ]
+      ],
+      "additionalProperties": false
     },
     "sentry": {
       "type": "object",
@@ -146,7 +150,8 @@
       },
       "required": [
         "project"
-      ]
+      ],
+      "additionalProperties": false
     },
     "changelog": {
       "type": "object",
@@ -168,7 +173,8 @@
       "required": [
         "mode",
         "path"
-      ]
+      ],
+      "additionalProperties": false
     },
     "intake": {
       "type": "object",
@@ -183,6 +189,7 @@
               "on",
               "tickets"
             ],
+            "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "string"
@@ -205,7 +212,8 @@
           },
           "default": []
         }
-      }
+      },
+      "additionalProperties": false
     },
     "preferences": {
       "type": "object",
@@ -258,7 +266,9 @@
           "source",
           "added"
         ],
+        "additionalProperties": false,
         "properties": {
+          "value": {},
           "why": {
             "type": "string"
           },

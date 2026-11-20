@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { CONFIG_KEYS, configSchema } from "../config-keys.mjs";
-import { checkConfig, configHelp, effectiveSettings } from "../hashsmith.mjs";
+import { checkConfig, checkWorkspace, closestKey, configHelp, effectiveSettings, jsonProblem } from "../hashsmith.mjs";
 
 const CLI = fileURLToPath(new URL("../hashsmith.mjs", import.meta.url));
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -107,7 +107,7 @@ describe("check-config agrees with the table", () => {
     assert.equal(checkConfig({ ...valid(), version: undefined }).length, 1, "version is required");
     const c = valid();
     c.hashops.lists.backlog = "";
-    assert.deepEqual(checkConfig(c), ["hashops.lists.backlog is not a list key (todo, in_progress, review, qa, done)."]);
+    assert.deepEqual(checkConfig(c), ['Unknown key "hashops.lists.backlog".']);
   });
 });
 
@@ -133,6 +133,15 @@ describe("hashsmith.schema.json", () => {
     assert.deepEqual(schema.properties.repositories.additionalProperties.required, ["path"]);
     assert.equal(schema.properties.repositories.additionalProperties.additionalProperties, false);
     assert.equal(schema.properties.learned.propertyNames.pattern, "^[a-z][a-z0-9_]*$");
+  });
+  it("closes every section the way check-config does (HSM-38)", () => {
+    const p = schema.properties;
+    for (const section of ["hashops", "repo", "qa", "sonar", "sentry", "changelog", "intake", "preferences"])
+      assert.equal(p[section].additionalProperties, false, section);
+    // A map of names stays open to any valid name; each entry is closed.
+    assert.equal(p.learned.additionalProperties.additionalProperties, false);
+    assert.deepEqual(Object.keys(p.learned.additionalProperties.properties), ["value", "why", "source", "added"]);
+    assert.equal(p.intake.properties.processed_meetings.items.additionalProperties, false);
   });
   it("each pattern accepts what check-config accepts", () => {
     const p = schema.properties;
@@ -172,6 +181,146 @@ describe("hashsmith.schema.json", () => {
     learned.learned["Bad-Name"] = learned.learned.qa_login_route;
     assert.equal(checkConfig(learned).length, 1);
     assert.doesNotMatch("Bad-Name", new RegExp(schema.properties.learned.propertyNames.pattern));
+  });
+});
+
+describe("check-config rejects unknown keys in every section (HSM-38)", () => {
+  const withKey = (key, v = "x") => {
+    const c = valid();
+    c.sentry = { project: "" };
+    setAt(c, key, v);
+    return checkConfig(c);
+  };
+  it("names a misspelled key and the key it was meant to be", () => {
+    const policy = valid();
+    policy.repo = { base_branch: "dev", branch_polcy: "current" };
+    assert.deepEqual(checkConfig(policy), ['Unknown key "repo.branch_polcy"; did you mean "repo.branch_policy"?']);
+    const c = valid();
+    delete c.qa.mode;
+    c.qa.mdoe = "code";
+    assert.deepEqual(checkConfig(c), ['Unknown key "qa.mdoe"; did you mean "qa.mode"?'], "a transposition is close");
+    assert.deepEqual(checkConfig({ ...valid(), sonar: { projectkey: "x" } }), ['Unknown key "sonar.projectkey"; did you mean "sonar.project_key"?']);
+  });
+  it("covers every section of a repository's file, and no name twice", () => {
+    for (const key of ["hashops.extra", "repo.extra", "qa.extra", "sonar.extra", "sentry.extra", "changelog.extra", "intake.extra"])
+      assert.deepEqual(withKey(key), [`Unknown key "${key}".`], key);
+  });
+  it("covers learned entries and processed meetings, whose shape is fixed", () => {
+    const c = valid();
+    c.learned.qa_login_route.note = "x";
+    c.intake.processed_meetings = [{ id: "m", on: "2026-11-19", tickets: [], extra: 1 }];
+    assert.deepEqual(checkConfig(c), ['Unknown key "intake.processed_meetings[0].extra".', 'Unknown key "learned.qa_login_route.note".']);
+  });
+  it("gives one error for a misspelled required key, not a second one saying it is missing", () => {
+    const c = valid();
+    c.hashops.board_ID = c.hashops.board_id;
+    delete c.hashops.board_id;
+    assert.deepEqual(checkConfig(c), ['Unknown key "hashops.board_ID"; did you mean "hashops.board_id"?']);
+    const log = valid();
+    log.changelog = { mdoe: "write", path: "CHANGELOG.md" };
+    assert.deepEqual(checkConfig(log), ['Unknown key "changelog.mdoe"; did you mean "changelog.mode"?']);
+    const meeting = valid();
+    meeting.intake.processed_meetings = [{ id: "m", on: "2026-11-19", tickts: [] }];
+    assert.deepEqual(checkConfig(meeting), ['Unknown key "intake.processed_meetings[0].tickts"; did you mean "intake.processed_meetings[0].tickets"?']);
+    const learned = valid();
+    learned.learned.qa_login_route = { value: 1, wyh: "x", source: "s", added: "2026-11-19" };
+    assert.deepEqual(checkConfig(learned), ['Unknown key "learned.qa_login_route.wyh"; did you mean "learned.qa_login_route.why"?']);
+  });
+  it("treats a misspelled list key like any other: one error, with the list it meant", () => {
+    const c = valid();
+    c.hashops.lists.in_progres = c.hashops.lists.in_progress;
+    delete c.hashops.lists.in_progress;
+    assert.deepEqual(checkConfig(c), ['Unknown key "hashops.lists.in_progres"; did you mean "hashops.lists.in_progress"?']);
+  });
+  it("still names the other problems beside a misspelled key", () => {
+    const learned = valid();
+    learned.learned = { BadName: learned.learned.qa_login_route, good: { value: 1, wyh: "x", source: "s", added: "2026-11-19" } };
+    assert.deepEqual(checkConfig(learned), ['Unknown key "learned.good.wyh"; did you mean "learned.good.why"?', 'learned key "BadName" must be snake_case.']);
+    const log = valid();
+    log.changelog = { mdoe: "write", path: "docs/CHANGELOG.md" };
+    assert.deepEqual(checkConfig(log), [
+      'Unknown key "changelog.mdoe"; did you mean "changelog.mode"?',
+      'changelog.path must be a .md file at the repo root, like "CHANGELOG.md".',
+    ]);
+  });
+  it("suggests only a key the file does not have yet", () => {
+    assert.deepEqual(withKey("repo.base_branc", "main"), ['Unknown key "repo.base_branc".']);
+  });
+  it("suggests at the top level and in preferences too, only when a name is close", () => {
+    assert.deepEqual(checkConfig({ ...valid(), sentyr: {} }), ['Unknown top-level key "sentyr"; did you mean "sentry"?']);
+    const c = valid();
+    c.hashop = c.hashops;
+    delete c.hashops;
+    assert.deepEqual(checkConfig(c), ['Unknown top-level key "hashop"; did you mean "hashops"?']);
+    assert.deepEqual(checkConfig({ ...valid(), preferences: { questoins: "normal" } }), ['Unknown preference "questoins"; did you mean "questions"?']);
+    assert.deepEqual(withKey("preferences.tone", "normal"), ['Unknown preference "tone".']);
+  });
+  it("checks a workspace file's sections the same way", () => {
+    const w = workspace();
+    w.hashops.boardid = w.hashops.board_id;
+    delete w.hashops.board_id;
+    w.learned = { a_fact: { value: 1, why: "w", source: "s", added: "2026-11-19", extra: 1 } };
+    assert.deepEqual(checkConfig(w), ['Unknown key "hashops.boardid"; did you mean "hashops.board_id"?', 'Unknown key "learned.a_fact.extra".']);
+    const child = { version: 1, hashops: hashops(), repo: { base_branch: "main", polcy: "" } };
+    const children = { api: { inside: true, git: true, dir: "/a", config: child }, web: { inside: true, git: true, dir: "/w", config: { version: 1, hashops: hashops() } } };
+    assert.deepEqual(checkWorkspace(workspace(), children), ['acme-api/hashsmith.json: Unknown key "repo.polcy".']);
+  });
+  it("quotes a key name safely and caps its length", () => {
+    const name = `a"b\n${"x".repeat(300)}`;
+    const [e] = checkConfig({ ...valid(), [name]: 1 });
+    assert.ok(e.length < 120, e);
+    assert.ok(!e.includes("\n"), "no raw line break");
+    assert.match(e, /^Unknown top-level key "a\\"b/);
+    const [r] = withKey(`repo.${"y".repeat(300)}`);
+    assert.ok(r.length < 120, r);
+    const [l] = withKey(`hashops.lists.x"\n${"y".repeat(200)}`);
+    assert.ok(l.length < 120 && !l.includes("\n"), l);
+    assert.deepEqual(withKey("repo.ab\u202Ec"), ['Unknown key "repo.ab\\u202ec".'], "an invisible character is shown escaped");
+    const personal = effectiveSettings(null, { [`k"\n${"z".repeat(200)}`]: 1 }, "P").errors[0];
+    assert.ok(personal.length < 120 && !personal.includes("\n"), personal);
+  });
+});
+
+describe("closestKey", () => {
+  const keys = ["base_branch", "branch_policy", "mode", "base_url", "on", "id", "questions"];
+  it("finds a typo, a transposition and a change of case", () => {
+    assert.equal(closestKey("branch_polcy", keys), "branch_policy");
+    assert.equal(closestKey("mdoe", keys), "mode");
+    assert.equal(closestKey("Base_Url", keys), "base_url");
+    assert.equal(closestKey("base_brnach", keys), "base_branch");
+  });
+  it("gives nothing for an unrelated or short name", () => {
+    assert.equal(closestKey("tone", keys), null);
+    assert.equal(closestKey("no", keys), null, "a short name must match exactly, case aside");
+    assert.equal(closestKey("ID", keys), "id");
+    assert.equal(closestKey("md", keys), null);
+    assert.equal(closestKey("anything", []), null);
+  });
+});
+
+describe("jsonProblem: where a file stops being JSON (HSM-38)", () => {
+  it("is null for valid JSON", () => assert.equal(jsonProblem('{"a": 1}'), null));
+  it("gives the line and column of the first bad character", () => {
+    assert.equal(jsonProblem('{\n  "a": 1\n  "b": 2\n}'), "is not valid JSON at line 3, column 3");
+    assert.equal(jsonProblem('{\n  "a": 1,\n}'), "is not valid JSON at line 3, column 1");
+    assert.equal(jsonProblem('{"a": 1, "b": x}'), "is not valid JSON at line 1, column 15", "no position in the engine's message");
+    assert.equal(jsonProblem('{\n  "a": tru}'), "is not valid JSON at line 2, column 11");
+    assert.equal(jsonProblem("{\n  'a': 1\n}"), "is not valid JSON at line 2, column 3");
+  });
+  it("names merge-conflict markers by line", () => {
+    const text = '<<<<<<< HEAD\n{"a": 1}\n=======\n{"a": 2}\n>>>>>>> ai/ACME-1-x\n';
+    assert.equal(jsonProblem(text), "has merge-conflict markers at lines 1, 3 and 5: resolve the conflict");
+    assert.equal(jsonProblem('{\n"a": 1,\n<<<<<<< HEAD\n}'), "has merge-conflict markers at line 3: resolve the conflict");
+  });
+  it("says when the file is empty or ends early", () => {
+    assert.equal(jsonProblem("  \n"), "is empty");
+    assert.equal(jsonProblem('{\n  "a": [1,\n'), "is not valid JSON: it ends early, at line 2 (an unclosed { or [?)");
+  });
+  it("never quotes the file's text", () => {
+    for (const text of ['{"secret": nope}', '{"x": "sk_live_abc', "<<<<<<< sk_live_abc\n"]) {
+      const p = jsonProblem(text);
+      assert.ok(!/nope|sk_live/.test(p), p);
+    }
   });
 });
 
@@ -217,6 +366,7 @@ describe("configHelp", () => {
     assert.deepEqual(none.errors, ["hashsmith.json not found."]);
     assert.deepEqual(none.missing, plain.filter(r => r.essential && r.required).map(r => r.key));
     assert.deepEqual(configHelp({ __invalid: true }, null).errors, ["hashsmith.json is not valid JSON."]);
+    assert.deepEqual(configHelp({ __invalid: true, problem: "is not valid JSON at line 2, column 1" }, null).errors, ["hashsmith.json is not valid JSON at line 2, column 1."]);
   });
   it("shows a workspace file's own keys, its repositories included", () => {
     const help = configHelp(workspace(), null);

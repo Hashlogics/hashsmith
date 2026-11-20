@@ -60,7 +60,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |
 | `agents/*.md` | Helper agents with restricted tools | skills, via the Agent tool |
 | `scripts/hashsmith.mjs` | The Hashsmith CLI | skills, through Bash |
-| `scripts/config-keys.mjs` | The one table of `hashsmith.json` keys: allowed values, default, scope, files, one line each. `check-config` takes its key names and allowed values from it; run directly, it prints the JSON Schema | the CLI; `npm run schema` |
+| `scripts/config-keys.mjs` | The one table of `hashsmith.json` keys: allowed values, default, scope, files, one line each. `check-config` takes its key names and allowed values from it and rejects any other; run directly, it prints the JSON Schema | the CLI; `npm run schema` |
 | `hashsmith.schema.json` | `hashsmith.json`'s JSON Schema, generated from the table (a test fails when they differ) | editors (README "Editor support") |
 | `vendor/taste-skill/` | The upstream taste skill (MIT), vendored whole and pinned in its `SOURCE.md`. It lives outside `skills/`, so it is not registered as a second skill | `design` skill, on demand |
 | `evals/<scenario>/` | Manual golden scenarios: `input.md` and the `expected.md` checklist | the maintainer, before a release |
@@ -126,7 +126,7 @@ repository's own handoff folder.
 | `lists-before-todo` (`get_board`'s lists on stdin) | the active lists before To Do in board order (Backlog, Icebox: any name), not mapped in `hashops.lists` | `next` |
 | `env-keys` | `.env.example` key names that the local env files lack (names only, never values) | `onboard-project` |
 | `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
-| `check-config` | `hashsmith.json` errors (exit 1 when invalid); at a workspace root, also each listed path and repository file | every skill, first |
+| `check-config` | `hashsmith.json` errors (exit 1 when invalid): unknown keys in any section with the key they likely meant, and where a file stops being JSON (line and column, or conflict-marker lines); at a workspace root, also each listed path and repository file | every skill, first |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
 | `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base, plus `pushed_commits`: every pushed one still delivering, oldest first; `reverted` when a revert cancels them) and `base-pushed` / `base-local`; an `ai/*` branch with no PR, no work of its own and cut before a pushed base commit gives way to it (`stale_branch`) | `sync`, `next`, `qa` |
 | `handoff-patch KEY…` | per key: the newest saved base- or other-branch patch under `~/.hashsmith/projects/<project_key>/handoffs/` (never an `ai/*` branch's), its `branch` (`/` as `-`), `current` (made on the checked-out branch) and `on_base` (made on `repo.base_branch`), or null | `sync` |

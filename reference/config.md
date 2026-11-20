@@ -48,6 +48,10 @@ looked up), scope (team, or personal for preferences) and one line on what it do
 takes its key names and allowed values from that table, the CLI's `config-help` prints it with this
 project's values and their source, `/hashsmith:config` shows it, and `hashsmith.schema.json` is
 generated from it. A new key gets its row there and its description here, in the same change.
+Every section is closed: `check-config` rejects a key the table does not know, in any section or
+learned entry, and names the key it most likely meant (`Unknown key "repo.branch_polcy"; did you
+mean "repo.branch_policy"?`). A file that is not JSON is reported with its line and column, or
+the lines of its merge-conflict markers.
 
 ## Core keys
 

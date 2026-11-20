@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Every hashsmith.json key, in one table (HSM-30). check-config takes its key names and allowed
-// values from here, config-help prints it, and hashsmith.schema.json is generated from it
-// (`npm run schema`); tests fail when any of them drifts. A new key gets a row here and its
-// description in reference/config.md, in the same change. Run directly, it prints the schema.
+// values from here and rejects any other name (HSM-38), config-help prints it, and
+// hashsmith.schema.json is generated from it (`npm run schema`); tests fail when any of them
+// drifts. A new key gets a row here and its description in reference/config.md, in the same
+// change. Run directly, it prints the schema.
 import { isMain, REPO_NAME } from "../hooks/lib.mjs";
 
 const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
@@ -66,6 +67,7 @@ export const CONFIG_KEYS = [
       items: {
         type: "object",
         required: ["id", "on", "tickets"],
+        additionalProperties: false,
         properties: {
           id: { type: "string" },
           on: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
@@ -89,13 +91,29 @@ export const CONFIG_KEYS = [
     schema: {
       type: "object",
       required: ["value", "why", "source", "added"],
-      properties: { why: { type: "string" }, source: { type: "string" }, added: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } },
+      additionalProperties: false,
+      properties: { value: {}, why: { type: "string" }, source: { type: "string" }, added: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } },
     },
   },
 ];
 
-// Objects check-config rejects unknown keys in ("" is the file itself).
-const CLOSED = new Set(["", "hashops.lists", "preferences", "repositories.<name>"]);
+/** Each object's allowed key names, from the rows (HSM-38): "" is the file itself, `<name>` a map
+ *  of any valid name, and `[]` an array's items (an object row's own fields come from its schema).
+ *  check-config rejects every other key, and the schema closes the same objects. */
+export const KNOWN_KEYS = (() => {
+  const known = {};
+  const add = (path, child) => {
+    const list = (known[path] ??= []);
+    if (!list.includes(child)) list.push(child);
+  };
+  for (const r of CONFIG_KEYS) {
+    const parts = r.key.split(".");
+    parts.forEach((part, i) => add(parts.slice(0, i).join("."), part));
+    for (const k of Object.keys(r.schema?.properties ?? {})) add(r.key, k);
+    for (const k of Object.keys(r.schema?.items?.properties ?? {})) add(`${r.key}[]`, k);
+  }
+  return known;
+})();
 
 const leafSchema = r => ({
   description: r.about,
@@ -114,6 +132,7 @@ export function configSchema() {
     properties: {},
   };
   const node = { "": root };
+  const sections = new Set([""]);
   for (const r of CONFIG_KEYS) {
     const parts = r.key.split(".");
     parts.forEach((part, i) => {
@@ -123,6 +142,7 @@ export function configSchema() {
       const last = i === parts.length - 1;
       const child = node[path] ?? (last ? leafSchema(r) : { type: "object", properties: {} });
       node[path] = child;
+      if (!last) sections.add(path);
       if (part === "<name>") {
         parent.propertyNames = { pattern: r.names.source };
         parent.additionalProperties = child;
@@ -135,7 +155,8 @@ export function configSchema() {
       if (needed && !(parent.required ??= []).includes(part)) parent.required.push(part);
     });
   }
-  for (const path of CLOSED) node[path].additionalProperties = false;
+  // Every section is closed, as check-config is; a map of names stays open to any valid name.
+  for (const path of sections) if (!node[path].propertyNames) node[path].additionalProperties = false;
   return root;
 }
 

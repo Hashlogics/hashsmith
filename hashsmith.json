@@ -14,7 +14,8 @@
     "ai_tag": "hashsmith"
   },
   "repo": {
-    "base_branch": "main"
+    "base_branch": "main",
+    "branch_policy": "current"
   },
   "changelog": {
     "mode": "off",
