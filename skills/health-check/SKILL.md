@@ -25,7 +25,7 @@ get from those two tools.
 ## 1. Preconditions
 
 Run the CLI's `check-config`. No `hashsmith.json`, or invalid: say so in one line and propose
-`/hashsmith:onboard-project`. Stop there. Read `hashops.project_id`.
+`/hashsmith:onboard`. Stop there. Read `hashops.project_id`.
 
 ## 2. Read the live health
 

@@ -4,6 +4,14 @@ Newest first. Each release is a `## <version> — <date>` section; the session-s
 teammates the sections newer than the last version they saw, so write them for developers, in
 two or three lines each.
 
+## 0.12.0 — 2026-11-20
+
+- `/hashsmith:onboard-project` is now `/hashsmith:onboard` (the old name still works for one
+  release). Run it again any time to change a setting: it shows every setting, asks "Change any?",
+  asks only the sections you pick, and shows each change as `key: old → new` before one yes.
+- It also asks how much Hashsmith asks, for the team or just for you; "just for you" writes
+  `~/.hashsmith/settings.json` after your yes. Nothing is written unless `check-config` passes first.
+
 ## 0.11.1 — 2026-11-20
 
 - `check-config` now catches a misspelled `hashsmith.json` key in any section and says which key

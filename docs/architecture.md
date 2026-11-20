@@ -60,7 +60,7 @@ developer's Claude Code session, on their machine, with their own HashOps and Gi
 | `skills/<name>/SKILL.md` | One skill each, ≤ 250 lines, becomes `/hashsmith:<name>` | Claude Code |
 | `agents/*.md` | Helper agents with restricted tools | skills, via the Agent tool |
 | `scripts/hashsmith.mjs` | The Hashsmith CLI | skills, through Bash |
-| `scripts/config-keys.mjs` | The one table of `hashsmith.json` keys: allowed values, default, scope, files, one line each. `check-config` takes its key names and allowed values from it and rejects any other; run directly, it prints the JSON Schema | the CLI; `npm run schema` |
+| `scripts/config-keys.mjs` | The one table of `hashsmith.json` keys: allowed values, default, scope, files, how onboarding gets each (`onboard`: lookup, detect, ask or keep), one line each. `check-config` takes its key names and allowed values from it and rejects any other; run directly, it prints the JSON Schema | the CLI; `npm run schema` |
 | `hashsmith.schema.json` | `hashsmith.json`'s JSON Schema, generated from the table (a test fails when they differ) | editors (README "Editor support") |
 | `vendor/taste-skill/` | The upstream taste skill (MIT), vendored whole and pinned in its `SOURCE.md`. It lives outside `skills/`, so it is not registered as a second skill | `design` skill, on demand |
 | `evals/<scenario>/` | Manual golden scenarios: `input.md` and the `expected.md` checklist | the maintainer, before a release |
@@ -120,20 +120,20 @@ repository's own handoff folder.
 
 | Command | Returns | Used by |
 | --- | --- | --- |
-| `repo-slug` (JSON array of link URLs on stdin) | `origin`, a slug per URL, and `matches` | `onboard-project` |
-| `project-candidates` (JSON array of `list_my_projects` rows on stdin) | `probes` (the folder and origin repo names) and up to five `candidates` named like them, exact before partial | `onboard-project` |
+| `repo-slug` (JSON array of link URLs on stdin) | `origin`, a slug per URL, and `matches` | `onboard` |
+| `project-candidates` (JSON array of `list_my_projects` rows on stdin) | `probes` (the folder and origin repo names) and up to five `candidates` named like them, exact before partial | `onboard` |
 | `repo-match` (the ticket's tags on stdin) | its `repo:` names, `match` (this repository, others, or null for none) and `others`; at a workspace root, the `repositories` they name, the `unknown` ones and the `ambiguous` ones (naming several) | `work` (assessment) |
 | `lists-before-todo` (`get_board`'s lists on stdin) | the active lists before To Do in board order (Backlog, Icebox: any name), not mapped in `hashops.lists` | `next` |
-| `env-keys` | `.env.example` key names that the local env files lack (names only, never values) | `onboard-project` |
-| `git-switch` | how the project's settings treat `git switch` | `onboard-project` |
-| `check-config` | `hashsmith.json` errors (exit 1 when invalid): unknown keys in any section with the key they likely meant, and where a file stops being JSON (line and column, or conflict-marker lines); at a workspace root, also each listed path and repository file | every skill, first |
+| `env-keys` | `.env.example` key names that the local env files lack (names only, never values) | `onboard` |
+| `git-switch` | how the project's settings treat `git switch` | `onboard` |
+| `check-config` | `hashsmith.json` errors (exit 1 when invalid): unknown keys in any section with the key they likely meant, and where a file stops being JSON (line and column, or conflict-marker lines); at a workspace root, also each listed path and repository file. `--stdin`: proposed content instead, writing nothing, with its `changes` (`key: old → new`); `--personal`: `~/.hashsmith/settings.json`, or content proposed for it, refused while the file there is unreadable | every skill, first; `onboard` before each write |
 | `tree` | clean flag, changed paths, current branch | `work`, `qa`, `next` |
 | `ticket-state KEY…` | per key: `ai/*` branch(es), the PR from `gh`, and the §4 state; with no branch, `base` (the newest commit carrying the key on `origin/<base_branch>` and on the local base, plus `pushed_commits`: every pushed one still delivering, oldest first; `reverted` when a revert cancels them) and `base-pushed` / `base-local`; an `ai/*` branch with no PR, no work of its own and cut before a pushed base commit gives way to it (`stale_branch`) | `sync`, `next`, `qa` |
 | `handoff-patch KEY…` | per key: the newest saved base- or other-branch patch under `~/.hashsmith/projects/<project_key>/handoffs/` (never an `ai/*` branch's), its `branch` (`/` as `-`), `current` (made on the checked-out branch) and `on_base` (made on `repo.base_branch`), or null | `sync` |
-| `changelog` | the changelog `mode` and `path` to use (stored, else detected from the repo's root files, `package.json` and workflows; tool and file names only), the `generator`, `ask` (nothing stored or found) and `changed` (write it to `hashsmith.json`) | `onboard-project`, `work` |
+| `changelog` | the changelog `mode` and `path` to use (stored, else detected from the repo's root files, `package.json` and workflows; tool and file names only), the `generator`, `ask` (nothing stored or found) and `changed` (write it to `hashsmith.json`) | `onboard`, `work` |
 | `changelog-check TYPE` (the handoff patch on stdin) | in `write` mode: `needs_entry` and `heading` for the commit type, `missing_entry`, and `problems` (ticket keys, file names or code in an entry, a release heading added or a section heading removed in the changelog, a changed `version` in the root `package.json`) | `work` |
 | `settings` | each preference (`questions`) with its `value` and `source` (`personal` from `~/.hashsmith/settings.json`, `team` from `hashsmith.json`, or `default`), `personal_file`, and `errors` naming invalid values, which are ignored | `work`, `intake`, `qa` |
-| `config-help` | every `hashsmith.json` key from the table in `scripts/config-keys.mjs` (allowed `values`, `default`, `when_unset`, `scope`, `about`) with this project's `value` and `source` (`team`, `personal`, `default`, `unset`), the `learned` keys, check-config's `ok` and `errors`, and the essential keys (`version`, `hashops.*`) `missing`; `--schema` prints the JSON Schema (`hashsmith.schema.json` is generated from the same table by `npm run schema`) | `config` |
+| `config-help` | every `hashsmith.json` key from the table in `scripts/config-keys.mjs` (allowed `values`, `default`, `when_unset`, `scope`, `onboard`, `about`) with this project's `value` and `source` (`team`, `personal`, `default`, `unset`; a personal key also gives the `team` value), the `learned` keys, check-config's `ok` and `errors`, and the essential keys (`version`, `hashops.*`) `missing`; `--schema` prints the JSON Schema (`hashsmith.schema.json` is generated from the same table by `npm run schema`) | `config`, `onboard` |
 | `feedback-target` | the feedback board, Backlog list and tags from `hooks/feedback-board.json`, and the plugin version (exit 1 when invalid); reads the plugin's files, so it runs from any repo | `feedback` |
 
 Link URLs, project names and list names come from HashOps, where any project lead can set one, so
@@ -159,8 +159,8 @@ they are read from stdin and never placed on a shell command line.
 
 | State | Where | Written by |
 | --- | --- | --- |
-| Which HashOps project, board, lists and tag belong to a repo; base branch; local URL; tool keys; processed meetings; learned settings | `hashsmith.json` in the project repo, committed by the developer (shape: `reference/config.md`) | `onboard-project`, `intake` (meetings), lessons (`learned`) |
-| Which repositories make up a workspace, and their shared HashOps block | the workspace root's `hashsmith.json`, outside every repository | `onboard-project` |
+| Which HashOps project, board, lists and tag belong to a repo; base branch; local URL; tool keys; processed meetings; learned settings | `hashsmith.json` in the project repo, committed by the developer (shape: `reference/config.md`) | `onboard`, `intake` (meetings), lessons (`learned`) |
+| Which repositories make up a workspace, and their shared HashOps block | the workspace root's `hashsmith.json`, outside every repository | `onboard` |
 | A ticket's stage | the board list it is in | the skills, via `move_task`, after a yes |
 | What happened to a ticket | its HashOps comments: plan, handoff, QA report | `work`, `qa` |
 | Whether the developer accepted the work | git: the `ai/KEY-12-slug` branch and its PR | the developer; read by `sync` |
@@ -214,7 +214,7 @@ never runs a git write.
 | Add a skill | `skills/<name>/SKILL.md` with `name` and a "Use when …" description; add evals; list it in the README and `design.md` §6 |
 | Draft or test a skill's wording | Anthropic's `skill-creator` skill helps with the draft–test–refine loop. Install it in your own Claude Code setup (from the `claude-plugins-official` marketplace); never vendor it or declare it as a plugin dependency. Override its defaults: keep its `<name>-workspace/` outside `skills/` (for example the scratchpad, or any folder outside the repo; the skills test reads every folder there as a skill); no `scripts/` or Python in a skill (logic goes in the CLI); no `evals/evals.json` in a skill (scenarios go in `evals/<name>/input.md` and `expected.md`); a `references/` folder needs `SOURCE.md`; at most 250 lines, not its 500; the description still starts with "Use when" after its description optimiser runs. Run its eval and description loops against a scratch HashOps project only, never the live `hashops` server in `.mcp.json`. CLAUDE.md's Rules (git-guard, `hooks/hashops-tools.json`, Releases) still apply |
 | Add exact logic a skill needs | A CLI command with a unit test, written first. Document it in the CLI header and the session-start hint |
-| Add or change a `hashsmith.json` key | A row in `scripts/config-keys.mjs` (check-config and `config-help` follow it), its own checks in `checkConfig` when it needs more than an allowed-values list, its description in `reference/config.md`, then `npm run schema` |
+| Add or change a `hashsmith.json` key | A row in `scripts/config-keys.mjs`, with its `onboard` way (check-config, `config-help` and `onboard` follow it; a `detect` row also gets a line in `reference/config.md`'s lookup table), its own checks in `checkConfig` when it needs more than an allowed-values list, its description in `reference/config.md`, then `npm run schema` |
 | Allow a new read-only git command | Add it to `READ` / `READ_IF` in `git-guard.mjs`, with a test line in `git-guard.test.mjs` |
 | Guard something new | A new hook file plus a `hooks.json` entry plus tests covering allow, ask/deny, no-opinion and crash |
 | Need a new HashOps capability | A hashops PR (tool, tests, catalogue) first; then the skill, and add the tool to `hashsmith` in `hooks/hashops-tools.json` (the skills test fails until both agree) |

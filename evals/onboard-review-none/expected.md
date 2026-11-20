@@ -1,0 +1,3 @@
+- [ ] Shows the settings table, then asks "Change any?" once; no other question.
+- [ ] Says "No changes" and writes nothing: `git status` is unchanged and no HashOps write tool is called.
+- [ ] Still prints the readiness report and proposes a next step.

@@ -43,7 +43,7 @@ describe("session-start", () => {
     const ctx = out.hookSpecificOutput.additionalContext;
     assert.match(ctx, /# Hashsmith conduct/);
     assert.match(ctx, /Git repositories here: acme-api, acme-web, main\./);
-    assert.match(ctx, /Only \/hashsmith:onboard-project runs here: it onboards them as one workspace \(.*reference\/workspace\.md/);
+    assert.match(ctx, /Only \/hashsmith:onboard runs here: it onboards them as one workspace \(.*reference\/workspace\.md/);
     assert.match(ctx, /with --repo <folder>/);
     assert.doesNotMatch(ctx.match(/Git repositories here: [^.]*\./)[0], /notes|\.hidden/);
     assert.match(out.systemMessage, /workspace not onboarded/);

@@ -10,7 +10,8 @@
 //   repo-match           a ticket's repo:<name> tags (its tags on stdin) against this repo's names
 //   env-keys             .env.example key names that .env / .env.local lack (names only, never values)
 //   git-switch           how .claude/settings(.local).json treat `git switch`
-//   check-config         validate hashsmith.json (exit 1 when invalid)
+//   check-config         validate hashsmith.json (exit 1 when invalid); --stdin: proposed content instead, with
+//                        the changes it makes (key: old → new); --personal: ~/.hashsmith/settings.json the same way
 //   tree                 working-tree state and current branch
 //   ticket-state KEY...  each ticket's ai/* branch (local or on origin) and PR, mapped to the design §4 states;
 //                        with no branch, commits carrying the key on repo.base_branch (base-pushed / base-local)
@@ -161,7 +162,7 @@ export function listsBeforeTodo(lists, mapped) {
   if (!Array.isArray(lists)) return { error: "stdin must be get_board's lists: a JSON array, or the board with its lists" };
   const rows = lists.filter(l => typeof l?.id === "string" && typeof l?.name === "string");
   const at = rows.findIndex(l => l.id === todo);
-  if (at === -1) return { error: "The To Do list in hashsmith.json is not on this board: run /hashsmith:onboard-project to refresh the ids" };
+  if (at === -1) return { error: "The To Do list in hashsmith.json is not on this board: run /hashsmith:onboard to refresh the ids" };
   const known = new Set(Object.values(mapped));
   const active = l => l.type == null || l.type === "active";
   return { lists: rows.slice(0, at).filter(l => active(l) && !known.has(l.id)).map(({ id, name }) => ({ id, name })) };
@@ -219,9 +220,10 @@ const PREFERENCES = Object.fromEntries(PREFERENCE_ROWS.map(r => [r.key.split("."
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = v => typeof v === "string";
 // A name from the file, in an error: quoted, escaped and short, so it reads as data.
-// Invisible format characters (bidi overrides, zero-width) are escaped too, so a name reads as it is.
-const named = s =>
-  JSON.stringify(s.length > 60 ? `${s.slice(0, 57)}…` : s).replace(/\p{Cf}/gu, ch => `\\u${ch.codePointAt(0).toString(16).padStart(4, "0")}`);
+// Invisible format and control characters (bidi overrides, zero-width) are escaped too, so a name reads as it is.
+const visible = text => text.replace(/[\p{Cf}\p{Cc}]/gu, ch => `\\u${ch.codePointAt(0).toString(16).padStart(4, "0")}`);
+const capped = text => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
+const named = s => visible(JSON.stringify(capped(s)));
 const andList = xs => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : `${xs[0]}`);
 
 /** Edits between two names, a swap of neighbours counting as one (optimal string alignment). */
@@ -451,28 +453,74 @@ function preferencesErrors(p) {
   });
 }
 
+/** A file's valid preferences, and the errors of its preferences block. */
+const usablePreferences = file => {
+  const p = isObj(file) ? file.preferences : undefined;
+  return isObj(p) ? Object.fromEntries(Object.entries(p).filter(([k, v]) => PREFERENCES[k]?.includes(v))) : {};
+};
+const preferenceBlockErrors = (file, label) => {
+  const p = isObj(file) ? file.preferences : undefined;
+  return p === undefined ? [] : preferencesErrors(p).map(m => `${label}: ${m}`);
+};
+
+/** A personal file's errors (~/.hashsmith/settings.json, `{preferences: {…}}` only); `personal` is
+ *  the parsed file, null when missing. */
+export function personalErrors(personal, label = "~/.hashsmith/settings.json") {
+  if (personal === null || personal === undefined) return [];
+  if (personal.__invalid) return [`${label} ${personal.problem ?? "is not valid JSON"}.`];
+  if (!isObj(personal)) return [`${label}: must be a JSON object holding preferences.`];
+  return [
+    ...preferenceBlockErrors(personal, label),
+    ...Object.keys(personal).filter(k => k !== "preferences").map(k => `${label}: Unknown key ${named(k)} (only preferences).`),
+  ];
+}
+
+/** Proposed content for the personal file (HSM-39: /hashsmith:onboard writes it after a yes),
+ *  against the file there now. An invalid file is never replaced (the developer fixes it by hand),
+ *  and the proposal keeps every preference the file sets: it merges, so nothing there is lost. */
+export function checkPersonal(proposed, existing, label = "~/.hashsmith/settings.json") {
+  const keep = "fix it by hand first: Hashsmith never overwrites an invalid file.";
+  if (existing?.__invalid) return [`${label} ${existing.problem ?? "is not valid JSON"}; ${keep}`];
+  if (existing !== null && existing !== undefined && !isObj(existing)) return [`${label} is not a JSON object; ${keep}`];
+  const broken = personalErrors(existing, label);
+  if (broken.length) return broken.map(m => `${m.replace(/\.$/, "")}; ${keep}`);
+  if (proposed?.__invalid) return [`Proposed content ${proposed.problem ?? "is not valid JSON"}.`];
+  if (!isObj(proposed)) return ["Proposed content must be a JSON object holding preferences."];
+  const errors = personalErrors(proposed, label);
+  const had = usablePreferences(existing);
+  const now = isObj(proposed.preferences) ? proposed.preferences : {};
+  for (const k of Object.keys(had)) if (!(k in now)) errors.push(`Proposed content drops preferences.${k}, which ${label} sets: keep it (a change merges into the file).`);
+  return errors;
+}
+
+/** What writing `after` over `before` changes (HSM-39), one `key: old → new` line per value: changed
+ *  ones in `after`'s order, then removed ones. Arrays compare whole; `(none)` marks a missing value.
+ *  `before` is the parsed file there now (null when missing or unreadable). Values are capped and
+ *  escaped, as in errors. */
+export function configChanges(before, after) {
+  const leaves = (v, at, out) => {
+    if (isObj(v)) for (const [k, x] of Object.entries(v)) leaves(x, at ? `${at}.${k}` : k, out);
+    else out.set(at, v);
+    return out;
+  };
+  const show = v => (v === undefined ? "(none)" : visible(capped(JSON.stringify(v))));
+  const old = leaves(isObj(before) && !before.__invalid ? before : {}, "", new Map());
+  const now = leaves(after, "", new Map());
+  const line = (k, a, b) => `${visible(k)}: ${show(a)} → ${show(b)}`;
+  return [
+    ...[...now].filter(([k, v]) => JSON.stringify(old.get(k)) !== JSON.stringify(v)).map(([k, v]) => line(k, old.get(k), v)),
+    ...[...old].filter(([k]) => !now.has(k)).map(([k, v]) => line(k, v, undefined)),
+  ];
+}
+
 /** Each preference's effective value and its source: the personal file's (~/.hashsmith/settings.json,
  *  `{preferences: {…}}`) over the team's (hashsmith.json), key by key, else the default. An empty or
  *  invalid value counts as unset; invalid ones are named in `errors`, so a broken file never stops a
  *  skill. `team` and `personal` are parsed files (null when missing). */
 export function effectiveSettings(team, personal, personalLabel = "~/.hashsmith/settings.json") {
-  const errors = [];
-  const usable = (file, label) => {
-    const p = isObj(file) ? file.preferences : undefined;
-    if (p === undefined) return {};
-    const bad = preferencesErrors(p);
-    errors.push(...bad.map(m => `${label}: ${m}`));
-    if (!isObj(p)) return {};
-    return Object.fromEntries(Object.entries(p).filter(([k, v]) => PREFERENCES[k]?.includes(v)));
-  };
-  const fromTeam = usable(team, "hashsmith.json");
-  let fromPersonal = {};
-  if (personal?.__invalid) errors.push(`${personalLabel} ${personal.problem ?? "is not valid JSON"}.`);
-  else if (personal !== null && personal !== undefined && !isObj(personal)) errors.push(`${personalLabel}: must be a JSON object holding preferences.`);
-  else if (isObj(personal)) {
-    fromPersonal = usable(personal, personalLabel);
-    for (const k of Object.keys(personal)) if (k !== "preferences") errors.push(`${personalLabel}: Unknown key ${named(k)} (only preferences).`);
-  }
+  const errors = [...preferenceBlockErrors(team, "hashsmith.json"), ...personalErrors(personal, personalLabel)];
+  const fromTeam = usablePreferences(team);
+  const fromPersonal = isObj(personal) ? usablePreferences(personal) : {};
   const result = {};
   for (const r of PREFERENCE_ROWS) {
     const k = r.key.split(".")[1];
@@ -506,12 +554,13 @@ export function configHelp(config, personal, personalLabel = "~/.hashsmith/setti
     const blank = stored === undefined || stored === "";
     if (r.essential && r.required && (stored === undefined || (stored === "" && !r.empty))) missing.push(r.key);
     let at;
-    if (r.scope === "personal") at = settings[r.key.split(".")[1]];
+    // A personal key shows its effective value, and the team's beside it (null when unset).
+    if (r.scope === "personal") at = { ...settings[r.key.split(".")[1]], team: blank ? null : stored };
     else if (!blank) at = { value: r.key === "learned.<name>" ? Object.keys(stored) : stored, source: "team" };
     else if (r.default !== null) at = { value: r.default, source: "default" };
     else at = { value: stored ?? null, source: "unset" };
-    const { key, values, default: def, unset, scope, about } = r;
-    return { key, section: key.split(".")[0], values, empty: !!r.empty, default: def, when_unset: unset ?? null, scope, about, ...at };
+    const { key, values, default: def, unset, scope, about, onboard } = r;
+    return { key, section: key.split(".")[0], values, empty: !!r.empty, default: def, when_unset: unset ?? null, scope, onboard, about, ...at };
   });
   let errors;
   if (!found) errors = [config?.__invalid ? `hashsmith.json ${config.problem ?? "is not valid JSON"}.` : "hashsmith.json not found."];
@@ -523,8 +572,9 @@ export function configHelp(config, personal, personalLabel = "~/.hashsmith/setti
 /** A valid workspace file against what is on disk for each repository (children: name →
  *  {inside, git, dir, config}): each path stays inside the workspace and holds its own Git
  *  repository (no two names for one folder) whose hashsmith.json is valid, is not a workspace,
- *  and has the workspace's hashops block. */
-export function checkWorkspace(c, children) {
+ *  and has the workspace's hashops block. `files: false` checks the paths only (a proposed root
+ *  file, HSM-39: its repositories' files are checked on their own before the write). */
+export function checkWorkspace(c, children, { files = true } = {}) {
   const e = [];
   const seen = new Map();
   for (const [name, { path }] of Object.entries(c.repositories)) {
@@ -535,6 +585,7 @@ export function checkWorkspace(c, children) {
     if (!child?.inside) e.push(`repositories.${name}.path must stay inside the workspace (symlinks followed).`);
     else if (twin) e.push(`repositories.${name}.path is the same repository as ${twin}'s.`);
     else if (!child.git) e.push(`repositories.${name}: ${path} is not a Git repository.`);
+    else if (!files) continue;
     else if (child.config === null || child.config === undefined) e.push(`${file} not found: onboard that repository first.`);
     else if (child.config.__invalid) e.push(`${file} ${child.config.problem ?? "is not valid JSON"}.`);
     else if (isObj(child.config) && "repositories" in child.config) e.push(`${file} is a workspace file; workspaces do not nest.`);
@@ -971,6 +1022,42 @@ const resolveRepository = (root, c, name) => {
   return { dir: child.dir };
 };
 
+const stdinText = () => (process.stdin.isTTY ? "" : readFileSync(0, "utf8"));
+/** Proposed content from stdin (HSM-39): the parsed value, or where it stops being JSON. */
+const stdinProposed = () => {
+  const text = stdinText();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { __invalid: true, problem: jsonProblem(text) };
+  }
+};
+const verdict = (errors, extra = {}) => (errors.length ? { ok: false, errors, ...extra } : { ok: true, ...extra });
+const personalPath = () => join(homedir(), ".hashsmith", "settings.json");
+
+/** check-config --personal: the developer's own file, or (with --stdin) content proposed for it,
+ *  with what it changes. Never writes. */
+const checkPersonalFile = args => {
+  const file = personalPath();
+  const existing = tryJson(file);
+  if (!args.includes("--stdin")) return verdict(personalErrors(existing, file), { file });
+  const proposed = stdinProposed();
+  return verdict(checkPersonal(proposed, existing, file), { ...(isObj(proposed) && !proposed.__invalid ? { changes: configChanges(existing, proposed) } : {}), file });
+};
+
+/** A workspace root's proposed file (HSM-39): its own keys and its repositories' paths. Each
+ *  repository's own file is checked with --repo before the write, and the whole workspace by
+ *  check-config after it. */
+const checkProposedWorkspace = (root, c) => {
+  let errors = isObj(c) && "repositories" in c ? checkConfig(c) : ["A workspace root's hashsmith.json lists its repositories."];
+  if (gitTop(root)) errors.push("A workspace root must not be inside a Git repository; it is a plain folder holding them.");
+  if (!errors.length) {
+    const children = Object.fromEntries(Object.entries(c.repositories).map(([name, { path }]) => [name, workspaceChild(root, path)]));
+    errors = checkWorkspace(c, children, { files: false });
+  }
+  return verdict(errors, { changes: configChanges(tryJson(join(root, "hashsmith.json")), c) });
+};
+
 const stdinJson = () => {
   const input = process.stdin.isTTY ? "" : readFileSync(0, "utf8").trim();
   try {
@@ -993,7 +1080,12 @@ let routedRepo = null;
 
 /** What runs at a workspace root without --repo; everything else needs a repository. */
 const WORKSPACE_COMMANDS = {
-  "check-config": (_args, root, c) => {
+  "check-config": (args, root, c) => {
+    if (args.includes("--stdin")) {
+      const proposed = stdinProposed();
+      if (proposed?.__invalid) return verdict([`Proposed content ${proposed.problem ?? "is not valid JSON"}.`]);
+      return isObj(proposed) ? checkProposedWorkspace(root, proposed) : verdict(["Proposed content must be a JSON object."]);
+    }
     let errors = checkConfig(c);
     // Inside a repository, session-start would take the session for that one repository.
     if (gitTop(root)) errors.push("A workspace root must not be inside a Git repository; it is a plain folder holding them.");
@@ -1077,16 +1169,24 @@ const COMMANDS = {
     const rules = [".claude/settings.json", ".claude/settings.local.json"].map(p => gitSwitchRule(tryJson(p)));
     return { rule: ["deny", "ask", "allow"].find(r => rules.includes(r)) ?? "none" };
   },
-  "check-config": () => {
-    const c = tryJson("hashsmith.json");
+  // --stdin checks proposed content and lists what it changes, before anything is written (HSM-39);
+  // --personal checks the developer's own ~/.hashsmith/settings.json the same way.
+  "check-config": args => {
+    if (args.includes("--personal")) return checkPersonalFile(args);
+    const stdin = args.includes("--stdin");
+    const c = stdin ? stdinProposed() : tryJson("hashsmith.json");
+    if (stdin && !isObj(c)) return { ok: false, errors: ["Proposed content must be a JSON object."] };
     if (c === null) return { ok: false, errors: ["hashsmith.json not found at the repo root."] };
-    if (c.__invalid) return { ok: false, errors: [`hashsmith.json ${c.problem ?? "is not valid JSON"}.`] };
+    if (c.__invalid) return { ok: false, errors: [`${stdin ? "Proposed content" : "hashsmith.json"} ${c.problem ?? "is not valid JSON"}.`] };
+    // Before a workspace is onboarded, its root is a plain folder: the proposed root file is checked here.
+    if (stdin && isObj(c) && "repositories" in c && !gitTop(process.cwd())) return checkProposedWorkspace(process.cwd(), c);
     // A workspace file is checked only at its own root (WORKSPACE_COMMANDS); in a repository the
     // hooks treat it as broken, so it must not pass here.
-    if (isObj(c) && "repositories" in c)
-      return { ok: false, errors: ["hashsmith.json here is a workspace file: run check-config at the workspace root; a repository's own file has no repositories."] };
-    const errors = checkConfig(c);
-    return errors.length ? { ok: false, errors } : { ok: true };
+    const errors =
+      isObj(c) && "repositories" in c
+        ? ["hashsmith.json here is a workspace file: run check-config at the workspace root; a repository's own file has no repositories."]
+        : checkConfig(c);
+    return verdict(errors, stdin ? { changes: configChanges(tryJson("hashsmith.json"), c) } : {});
   },
   // Read-only, for /hashsmith:config: every key, this project's values and where they come from.
   "config-help": args => {
@@ -1222,6 +1322,8 @@ function route(cmd, argv) {
     process.chdir(target.dir); // checked: a repository's own top folder inside the root
     routedRepo = flag.repo;
   } else if (workspace) {
+    // The developer's own file is the same file wherever the session runs.
+    if (cmd === "check-config" && flag.args.includes("--personal")) return { result: checkPersonalFile(flag.args) };
     if (WORKSPACE_COMMANDS[cmd]) return { result: WORKSPACE_COMMANDS[cmd](flag.args, root, workspace) };
     // git-switch reads the root's own .claude settings: the ones a session here runs under; settings
     // and config-help, the root file's preferences and keys.

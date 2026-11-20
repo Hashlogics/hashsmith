@@ -55,23 +55,30 @@ move it aside first.
 
 1. **Pick.** Ask which repositories to onboard (several at once; all recommended) and whether to
    use the per-repository workflow instead (README "One product, several repositories"). Each
-   repository's name is its folder name. On a refresh, a repository not listed yet is added to
-   the root file's `repositories` first (show it, after a yes), so `--repo` reaches it.
-2. **Shared block, once.** Run onboard-project §2–3 one time for all of them: `project-candidates`
+   repository's name is its folder name. On a review (a root file exists), a repository not
+   listed yet is added to the root file's `repositories` first (show it, after a yes), so
+   `--repo` reaches it. The review's table (onboard §1) is one table per file: the root's
+   (`config-help`) and each repository's (`config-help --repo <name>`); "Change any?" names the
+   file with each section.
+2. **Shared block, once.** Run onboard §2–3 one time for all of them: `project-candidates`
    and `repo-slug` with `--repo <name>` for each picked repository, the union of their
    candidates, and a link that matches any one of them. A repository that already has its own
    `hashsmith.json`: its `hashops` block is the proposal; when two disagree, ask which project
    and board the workspace uses. Then the `repo:<name>` tag of every picked repository, as in
    **Missing tags**; without `create_project_tag`, name the missing ones once, carry on, and
    repeat them in step 5 as tags for a project lead to create.
-3. **Each repository.** onboard-project §4–5 for each, in turn, with `--repo <name>` and
+3. **Each repository.** onboard §4–5 for each, in turn, with `--repo <name>` and
    `git -C <path>`, reading its files under `<path>/`. A repository already onboarded keeps its
-   values, as in a refresh. In §5, "Branch creation allowed" is CLI `git-switch` at the root, and
+   values, except the sections chosen for it in the review. In §5, "Branch creation allowed" is CLI `git-switch` at the root, and
    one more line per repository with its own `<path>/.claude/settings.json`: "applies only in
    its own session; copy the rules you need into the root's `.claude/settings.json`".
-4. **Write.** Show every file: each `<path>/hashsmith.json` (the shared `hashops` block plus its
-   own keys) and the root file (`version`, `hashops`, `repositories`). After one yes, write them
-   all, then run `check-config` at the root; fix any error before going on.
+4. **Check, then write** (onboard §6). Check every proposed file before writing any: each
+   `<path>/hashsmith.json` (the shared `hashops` block plus its own keys) with `check-config
+   --repo <name> --stdin`, and the root file (`version`, `hashops`, `repositories`, and
+   `preferences` when chosen) with `check-config --stdin` at the root, which checks its own keys
+   and the paths. Show every file's `changes` (a first onboarding: every file in full); after one
+   yes, write them all, then run `check-config` at the root, which also checks that every
+   repository's `hashops` block matches; fix any error before going on.
 5. **Finish.** Tell the developer to start a new Claude Code session in this folder, so session
    start reads the workspace, and to commit each repository's file in that repository. The root
    file sits outside every repository; say so, and suggest keeping a copy where the team finds it.

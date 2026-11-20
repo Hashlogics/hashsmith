@@ -1,4 +1,6 @@
-- [ ] Treats the run as a refresh and says so.
-- [ ] Shows board_id (and any list ids) as old → new, naming "Sprint 9".
+- [ ] Treats the run as a review and says so; shows the settings table before asking anything.
+- [ ] Asks "Change any?" once (sections as choices, None the default); asks no other question.
+- [ ] Looks the board up without a question and shows board_id (and any list ids) as old → new, naming "Sprint 9".
+- [ ] Runs `check-config --stdin` on the proposed file before writing; the shown changes are only the hashops ids.
 - [ ] The written file keeps learned.qa_login_route and intake.processed_meetings unchanged.
 - [ ] Runs check-config after writing and reports ok.

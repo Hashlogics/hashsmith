@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -874,7 +874,102 @@ describe("feedbackTarget", () => {
   it("rejects a missing file", () => assert.equal(feedbackTarget(null, { version: "1.0.0" }).ok, false));
 });
 
+describe("configChanges: what a proposed file changes (HSM-39)", () => {
+  it("lists each changed, added and removed value as key: old → new", () => {
+    const before = { version: 1, repo: { base_branch: "dev", branch_policy: "managed" }, qa: { mode: "code" }, learned: { a: { value: 1 } } };
+    const after = { version: 1, repo: { base_branch: "dev", branch_policy: "current" }, sentry: { project: "acme" }, learned: { a: { value: 1 } } };
+    assert.deepEqual(cli.configChanges(before, after), [
+      'repo.branch_policy: "managed" → "current"',
+      'sentry.project: (none) → "acme"',
+      'qa.mode: "code" → (none)',
+    ]);
+  });
+  it("is empty when nothing changes, and lists every value against no file", () => {
+    assert.deepEqual(cli.configChanges({ a: { b: [1, 2] } }, { a: { b: [1, 2] } }), []);
+    assert.deepEqual(cli.configChanges(null, { version: 1, preferences: { questions: "normal" } }), ["version: (none) → 1", 'preferences.questions: (none) → "normal"']);
+    assert.deepEqual(cli.configChanges({ __invalid: true }, { version: 1 }), ["version: (none) → 1"]);
+  });
+  it("compares arrays whole, and caps and escapes what it shows", () => {
+    assert.deepEqual(cli.configChanges({ intake: { processed_meetings: [] } }, { intake: { processed_meetings: [{ id: "m" }] } }), ['intake.processed_meetings: [] → [{"id":"m"}]']);
+    const [line] = cli.configChanges({}, { learned: { ["x‮y"]: "z".repeat(100) } });
+    assert.match(line, /^learned\.x\\u202ey: \(none\) → "z{56}…$/);
+  });
+});
+
+describe("checkPersonal: a proposed ~/.hashsmith/settings.json (HSM-39)", () => {
+  const P = "~/.hashsmith/settings.json";
+  it("accepts preferences, with or without a file there now", () => {
+    assert.deepEqual(cli.checkPersonal({ preferences: { questions: "detailed" } }, null, P), []);
+    assert.deepEqual(cli.checkPersonal({ preferences: { questions: "normal" } }, { preferences: { questions: "detailed" } }, P), []);
+  });
+  it("rejects what the file may not hold", () => {
+    assert.deepEqual(cli.checkPersonal({ preferences: { questions: "loud" } }, null, P), [`${P}: preferences.questions must be "normal", "detailed" or "".`]);
+    assert.deepEqual(cli.checkPersonal({ preferences: {}, repo: {} }, null, P), [`${P}: Unknown key "repo" (only preferences).`]);
+    assert.deepEqual(cli.checkPersonal([1], null, P), ["Proposed content must be a JSON object holding preferences."]);
+    assert.deepEqual(cli.checkPersonal(null, null, P), ["Proposed content must be a JSON object holding preferences."]);
+    assert.deepEqual(cli.checkPersonal({ __invalid: true, problem: "is empty" }, null, P), ["Proposed content is empty."]);
+  });
+  it("never replaces a file it cannot read", () => {
+    const ok = { preferences: { questions: "detailed" } };
+    assert.deepEqual(cli.checkPersonal(ok, { __invalid: true, problem: "is not valid JSON at line 1, column 3" }, P), [
+      `${P} is not valid JSON at line 1, column 3; fix it by hand first: Hashsmith never overwrites an invalid file.`,
+    ]);
+    assert.deepEqual(cli.checkPersonal(ok, [1], P), [`${P} is not a JSON object; fix it by hand first: Hashsmith never overwrites an invalid file.`]);
+  });
+  it("never replaces a file whose content is invalid, and keeps every preference already there", () => {
+    assert.deepEqual(cli.checkPersonal({ preferences: { questions: "detailed" } }, { preferences: { questions: "loud" }, theme: "dark" }, P), [
+      `${P}: preferences.questions must be "normal", "detailed" or ""; fix it by hand first: Hashsmith never overwrites an invalid file.`,
+      `${P}: Unknown key "theme" (only preferences); fix it by hand first: Hashsmith never overwrites an invalid file.`,
+    ]);
+    assert.deepEqual(cli.checkPersonal({}, { preferences: { questions: "normal" } }, P), [
+      `Proposed content drops preferences.questions, which ${P} sets: keep it (a change merges into the file).`,
+    ]);
+    assert.deepEqual(cli.checkPersonal({ preferences: { questions: "" } }, { preferences: { questions: "normal" } }, P), [], "set to unset is a change, not a drop");
+  });
+});
+
 describe("CLI", () => {
+  it("check-config --stdin checks proposed content and lists its changes, writing nothing (HSM-39)", () => {
+    const dir = fixtureRepo();
+    const file = { version: 1, hashops: { project_id: U(1), project_key: "ACME", board_id: U(2), lists: { todo: U(3), in_progress: U(4), review: U(5), qa: U(6), done: U(7) }, ai_tag: "hashsmith" }, repo: { base_branch: "main" } };
+    writeFileSync(join(dir, "hashsmith.json"), JSON.stringify(file));
+    const run = (args, input) => {
+      const r = spawnSync(process.execPath, [CLI, "check-config", ...args], { cwd: dir, encoding: "utf8", input });
+      return { status: r.status, out: JSON.parse(r.stdout) };
+    };
+    const ok = run(["--stdin"], JSON.stringify({ ...file, repo: { base_branch: "main", branch_policy: "current" } }));
+    assert.deepEqual(ok, { status: 0, out: { ok: true, changes: ['repo.branch_policy: (none) → "current"'] } });
+    const bad = run(["--stdin"], JSON.stringify({ ...file, repo: { base_branch: "main", branch_polcy: "current" } }));
+    assert.equal(bad.status, 1);
+    assert.deepEqual(bad.out.errors, ['Unknown key "repo.branch_polcy"; did you mean "repo.branch_policy"?']);
+    assert.deepEqual(run(["--stdin"], '{"version": 1,}').out, { ok: false, errors: ["Proposed content is not valid JSON at line 1, column 15."] });
+    assert.deepEqual(run(["--stdin"], "").out, { ok: false, errors: ["Proposed content is empty."] });
+    assert.deepEqual(run(["--stdin"], "null").out, { ok: false, errors: ["Proposed content must be a JSON object."] });
+    assert.match(run(["--stdin"], JSON.stringify({ ...file, repositories: {} })).out.errors[0], /workspace file/);
+    assert.equal(readFileSync(join(dir, "hashsmith.json"), "utf8"), JSON.stringify(file), "the file on disk is untouched");
+  });
+  it("check-config --personal checks the developer's own file, or proposed content on stdin (HSM-39)", () => {
+    const dir = fixtureRepo();
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const run = (args, input) => {
+      const r = spawnSync(process.execPath, [CLI, "check-config", "--personal", ...args], { cwd: dir, encoding: "utf8", input, env: { ...process.env, HOME: home } });
+      return { status: r.status, out: JSON.parse(r.stdout) };
+    };
+    const PERSONAL = join(home, ".hashsmith", "settings.json");
+    assert.deepEqual(run([]), { status: 0, out: { ok: true, file: PERSONAL } });
+    assert.deepEqual(run(["--stdin"], '{"preferences": {"questions": "detailed"}}'), {
+      status: 0,
+      out: { ok: true, changes: ['preferences.questions: (none) → "detailed"'], file: PERSONAL },
+    });
+    assert.deepEqual(run(["--stdin"], "null").out.errors, ["Proposed content must be a JSON object holding preferences."]);
+    mkdirSync(join(home, ".hashsmith"));
+    writeFileSync(PERSONAL, '{"preferences": {"questions": "detailed"}');
+    const blocked = run(["--stdin"], '{"preferences": {"questions": "normal"}}');
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.out.errors[0], /settings\.json is not valid JSON at line 1, column 42; fix it by hand first: Hashsmith never overwrites an invalid file\.$/);
+    assert.equal(run([]).status, 1);
+    assert.equal(existsSync(PERSONAL) && readFileSync(PERSONAL, "utf8"), '{"preferences": {"questions": "detailed"}', "never written");
+  });
   it("feedback-target reads the plugin's own board file and version", () => {
     const r = spawnSync(process.execPath, [CLI, "feedback-target"], { cwd: tmpdir(), encoding: "utf8" });
     assert.equal(r.status, 0, r.stdout + r.stderr);
@@ -1108,6 +1203,39 @@ describe("CLI in a workspace", () => {
     const bad = run(root, ["check-config"]);
     assert.equal(bad.status, 1, bad.raw);
     assert.deepEqual(bad.out.errors, ["apps/web/hashsmith.json: hashops.board_id differs from the workspace's."]);
+  });
+  it("check-config --stdin at the root checks a proposed root file and its paths, not the files beside it (HSM-39)", () => {
+    const { root, web } = fixtureWorkspace();
+    const before = readFileSync(join(root, "hashsmith.json"), "utf8");
+    writeFileSync(join(web, "hashsmith.json"), "{"); // being rewritten in the same onboarding
+    mkdirSync(join(root, "plain"));
+    const repositories = { "acme-api": { path: "acme-api" }, web: { path: "apps/web" } };
+    const ok = run(root, ["check-config", "--stdin"], JSON.stringify({ version: 1, hashops, preferences: { questions: "detailed" }, repositories }));
+    assert.deepEqual(ok.out, { ok: true, changes: ['preferences.questions: (none) → "detailed"'] }, ok.raw);
+    const bad = run(root, ["check-config", "--stdin"], JSON.stringify({ version: 1, hashops, repositories: { ...repositories, plain: { path: "plain" } } }));
+    assert.equal(bad.status, 1, bad.raw);
+    assert.deepEqual(bad.out.errors, ["repositories.plain: plain is not a Git repository."]);
+    assert.match(run(root, ["check-config", "--stdin"], JSON.stringify({ version: 1, hashops })).out.errors[0], /lists its repositories/);
+    assert.equal(readFileSync(join(root, "hashsmith.json"), "utf8"), before);
+  });
+  it("check-config --stdin works before the workspace file exists: the root's, and each repository's with --repo (HSM-39)", () => {
+    const { root, api } = fixtureWorkspace();
+    rmSync(join(root, "hashsmith.json"));
+    rmSync(join(api, "hashsmith.json"));
+    const rootFile = { version: 1, hashops, repositories: { "acme-api": { path: "acme-api" } } };
+    assert.deepEqual(run(root, ["check-config", "--stdin"], JSON.stringify(rootFile)).out.ok, true);
+    const own = run(root, ["check-config", "--repo", "acme-api", "--stdin"], JSON.stringify({ version: 1, hashops, repo: { base_branch: "dev" } }));
+    assert.equal(own.status, 0, own.raw);
+    assert.equal(own.out.ok, true, own.raw);
+    assert.ok(own.out.changes.includes('repo.base_branch: (none) → "dev"'));
+    assert.equal(existsSync(join(api, "hashsmith.json")), false);
+  });
+  it("check-config --personal runs at a workspace root too (HSM-39)", () => {
+    const { root } = fixtureWorkspace();
+    const home = mkdtempSync(join(tmpdir(), "hashsmith-home-"));
+    const r = spawnSync(process.execPath, [CLI, "check-config", "--personal", "--stdin"], { cwd: root, encoding: "utf8", input: '{"preferences": {"questions": "normal"}}', env: { ...process.env, HOME: home } });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(JSON.parse(r.stdout).ok, true);
   });
   it("settings runs at the root with the workspace's value, and in a repository with --repo", () => {
     const { root, web } = fixtureWorkspace();

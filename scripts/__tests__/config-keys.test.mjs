@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { CONFIG_KEYS, configSchema } from "../config-keys.mjs";
+import { CONFIG_KEYS, configSchema, ONBOARD_WAYS } from "../config-keys.mjs";
 import { checkConfig, checkWorkspace, closestKey, configHelp, effectiveSettings, jsonProblem } from "../hashsmith.mjs";
 
 const CLI = fileURLToPath(new URL("../hashsmith.mjs", import.meta.url));
@@ -65,6 +65,22 @@ describe("the key table", () => {
     for (const r of CONFIG_KEYS) assert.equal(r.scope === "personal", r.key.startsWith("preferences."), r.key);
     for (const r of CONFIG_KEYS.filter(r => r.scope === "personal"))
       assert.equal(effectiveSettings(null, null)[r.key.split(".")[1]].value, r.default, r.key);
+  });
+  it("every row says how /hashsmith:onboard gets it (HSM-39)", () => {
+    for (const r of CONFIG_KEYS) assert.ok(ONBOARD_WAYS.includes(r.onboard), `${r.key}: onboard must be one of ${ONBOARD_WAYS.join(", ")}`);
+    for (const r of CONFIG_KEYS.filter(r => r.key.startsWith("hashops."))) assert.equal(r.onboard, "lookup", r.key);
+    for (const r of CONFIG_KEYS.filter(r => r.scope === "personal")) assert.equal(r.onboard, "ask", r.key);
+    for (const r of CONFIG_KEYS.filter(r => r.onboard === "ask")) assert.ok(Array.isArray(r.values) && r.default !== null, `${r.key}: an asked key offers its values and recommends its default`);
+  });
+  it("reference/config.md says how each looked-up or detected key is found, so onboarding needs no wording of its own", () => {
+    const text = readFileSync(join(ROOT, "reference", "config.md"), "utf8");
+    const table = text.slice(text.indexOf("## How each core key is looked up again")).split("\n").filter(l => l.startsWith("| `"));
+    for (const r of CONFIG_KEYS.filter(r => ["lookup", "detect"].includes(r.onboard))) {
+      const parts = r.key.split(".");
+      const section = parts.slice(0, -1).join(".");
+      const row = table.find(l => l.includes(`\`${r.key}\``) || (l.includes(`\`${section}.`) && (l.includes(`\`${parts.at(-1)}\``) || l.includes(`\`${section}.*\``))));
+      assert.ok(row, `${r.key}: no row in reference/config.md's lookup table`);
+    }
   });
 });
 
@@ -353,6 +369,13 @@ describe("configHelp", () => {
     );
     assert.match(r.about, /\.$/);
     assert.equal(typeof row(help, "repo.base_branch").when_unset, "string");
+    for (const k of help.keys) assert.equal(k.onboard, CONFIG_KEYS.find(t => t.key === k.key).onboard, `${k.key}: how onboarding gets it (HSM-39)`);
+  });
+  it("gives a personal key's team value beside the effective one, so onboarding can show both (HSM-39)", () => {
+    const over = configHelp(valid(), { preferences: { questions: "normal" } });
+    assert.deepEqual([row(over, "preferences.questions").value, row(over, "preferences.questions").source, row(over, "preferences.questions").team], ["normal", "personal", "detailed"]);
+    assert.equal(row(configHelp({ ...valid(), preferences: {} }, null), "preferences.questions").team, null);
+    assert.equal("team" in row(over, "repo.branch_policy"), false, "only personal-scope rows carry it");
   });
   it("names the core keys that are missing, so the skill can propose onboarding", () => {
     const c = valid();

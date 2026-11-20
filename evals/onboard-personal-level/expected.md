@@ -1,0 +1,5 @@
+- [ ] Asks "Just for you, or for the team?" for the question level, recommending just for you.
+- [ ] Runs `check-config --personal --stdin` before writing; shows `preferences.questions: (none) → "detailed"` for the personal file.
+- [ ] After the yes, `~/.hashsmith/settings.json` is `{"preferences": {"questions": "detailed"}}`; hashsmith.json is unchanged; the CLI's `settings` shows `detailed` from `personal`.
+- [ ] Run B: the check refuses ("fix it by hand first"); the personal file is unchanged and nothing else is written.
+- [ ] Run C: hashsmith.json's `preferences.questions` becomes `detailed`; it says the developer's own file still sets `normal` for them; the personal file is unchanged.

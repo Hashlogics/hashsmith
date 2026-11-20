@@ -12,7 +12,7 @@ developer reviews the unstaged change.
 Tools: HashOps calls are the `mcp__plugin_hashsmith_hashops__*` tools. "The CLI" is the
 `Hashsmith CLI` line in your session context. Read `hashops.*`, `repo.base_branch`,
 `repo.branch_policy` and `qa.base_url` from `hashsmith.json` (run the CLI's `check-config` first; invalid or missing →
-propose `/hashsmith:onboard-project` and stop), and the question level from the CLI's `settings`
+propose `/hashsmith:onboard` and stop), and the question level from the CLI's `settings`
 (`questions.value`: `normal` or `detailed`; conduct 3). At a workspace root (session start says so), also follow `reference/workspace.md`: its "Everywhere" section and this skill's own.
 
 ## 1. Choose the tickets

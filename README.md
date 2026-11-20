@@ -20,7 +20,7 @@ step at every stage:
 **You stay in charge.** Hashsmith never commits, pushes, deploys or touches a real environment. You
 review every change and do the commit, the push and the PR yourself.
 
-**Status: 0.11.1** (`onboard-project`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
+**Status: 0.12.0** (`onboard`, `intake`, `next`, `work`, `sync`, `design`, `qa`,
 `feedback`, `health-check`, `config`). Next: `triage`. Changes: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## How it fits together
@@ -84,13 +84,18 @@ says so.
    cd ~/Sites/hashlogics/<project>
    claude
    ```
-2. Run `/hashsmith:onboard-project`. It:
+2. Run `/hashsmith:onboard`. It:
    - finds the project's HashOps project from its repository link, and its active board;
    - maps the board's lists, offering to add a **QA** list and a **`hashsmith`** tag if they are missing;
-   - fills in the base branch, the local URL and the tool keys;
+   - fills in the base branch, the local URL and the tool keys, and asks the rest (branch policy,
+     changelog, how much Hashsmith asks), each with a recommended answer;
    - checks your machine and prints a readiness report: pass, fail or blocked for each item, with
      the fix;
-   - shows `hashsmith.json` and writes it after your yes.
+   - checks `hashsmith.json`, shows it and writes it after your yes.
+
+   **To change a setting later, run `/hashsmith:onboard` again.** It checks the HashOps ids
+   quietly, shows every setting in one table and asks "Change any?"; only the sections you pick
+   are asked again, then you see each change as `key: old → new` before one yes writes it.
 3. Commit `hashsmith.json` with your next PR. Teammates then skip the lookup.
 
 If the project's `.claude/settings.json` denies `git switch`, move `Bash(git switch *)` from deny to
@@ -102,15 +107,16 @@ you when that is needed.
 `"preferences": {"questions": "normal"}` in `hashsmith.json` (the default) lets Hashsmith take each
 recommended answer and list it under **Assumed** next to the one yes it asks for: when a ticket's
 assessment is OK, `work` shows the brief and the plan together. `"detailed"` asks every question batch. To choose for
-yourself only, put the same block in `~/.hashsmith/settings.json`; the CLI's `settings` shows which
-value applies and where it comes from. Both levels still ask before every HashOps write, every
+yourself only, run `/hashsmith:onboard`, pick **preferences** and answer "just for you": it writes
+`~/.hashsmith/settings.json` after your yes (or put the same block there yourself); the CLI's
+`settings` shows which value applies and where it comes from. Both levels still ask before every HashOps write, every
 branch switch and on every assessment Concern or Stop.
 
 ### Every setting: `/hashsmith:config`
 
 `/hashsmith:config` shows every `hashsmith.json` key with its allowed values, its default, this
 project's value and where that comes from (`team`, `personal`, `default`, or `unset`: looked up
-when needed), plus the learned keys. It changes nothing.
+when needed), plus the learned keys. It changes nothing; `/hashsmith:onboard` changes a value.
 
 **Editor support.** `hashsmith.json`'s JSON Schema ships with the plugin. The plugin's folder
 changes with each version, so keep a copy and refresh it after an update:
@@ -135,7 +141,7 @@ repository it belongs to, `repo:<folder name>` (create the tags once in HashOps)
 needs several gets one tag per repository.
 
 **One workspace session.** Start Claude Code in the parent folder and run
-`/hashsmith:onboard-project`. Pick the repositories; Hashsmith settles the project and board once,
+`/hashsmith:onboard`. Pick the repositories; Hashsmith settles the project and board once,
 gives each repository its own `hashsmith.json` (its own base branch, branch policy and QA settings)
 and writes a small `hashsmith.json` in the parent folder that lists them. Commit each repository's
 file in that repository; the parent folder's file is outside every repository, so keep a copy where
@@ -166,7 +172,7 @@ always just say what you want instead.
 | `/hashsmith:qa [KEY-12]` | On your local app only: switches to the PR branch (you approve) and logs in as the right test user. Then it runs each acceptance criterion with screenshots attached to the ticket, and moves the ticket to Done or back to To Do with the failing steps. A project with no web UI is checked against its code and tests instead |
 | `/hashsmith:feedback [what went wrong]` | Files one ticket per point on the Hashsmith board's Backlog, with you as the reporter, after your yes. Written in general terms (no client, project or code specifics), with a concrete before/after edit to the skill. Works in any repo |
 | `/hashsmith:health-check` | Fills in the project's HashOps health report (leads only). It audits the repo against each checklist item with evidence, asks you what the code can't show, shows the draft and projected score, and marks the items after your yes. You press **Mark as Completed** in HashOps |
-| `/hashsmith:onboard-project` | Set up or refresh the project's `hashsmith.json` |
+| `/hashsmith:onboard` | Set up the project's `hashsmith.json`, or review every setting and change the ones you pick (your own question level too). Was `/hashsmith:onboard-project` until 0.12.0 |
 | `/hashsmith:config` | Shows every `hashsmith.json` setting: allowed values, default, this project's value and where it comes from, and how to set your own. Read-only |
 
 ### A ticket's life
@@ -211,7 +217,7 @@ Your next session starts with a short "what's new".
 | A `git switch` is denied | The project denies it: see "Set up a project" |
 | HashOps says a write tool doesn't exist, or writes stop working | Your Connected apps level for this connection is Read only: in HashOps, open your profile → Connected apps and set Claude Code to **Work** |
 | A HashOps call is denied: "only allows the tools its skills use" (for example logging time or a to-do) | Hashsmith's connection is for ticket work only. Log your Daily Recap or to-do in the HashOps app, or through your own HashOps connection (for example `peoplemuster`), which asks before each write in an onboarded project |
-| A HashOps call asks "reaches outside this project" | Say no unless you meant it. If `hashsmith.json` is stale, run `/hashsmith:onboard-project` |
+| A HashOps call asks "reaches outside this project" | Say no unless you meant it. If `hashsmith.json` is stale, run `/hashsmith:onboard` |
 | Design or QA says the browser is missing | `npx playwright install chromium`, then restart Claude Code |
 
 ## Feedback

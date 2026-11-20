@@ -63,7 +63,7 @@ function workspaceStart(dir, ws, version, seenFile) {
     `This is a workspace root: hashsmith.json at ${dir} lists the repositories ${repos || "(none)"}, all on HashOps project ${key ?? "(none)"}. Every /hashsmith:* skill runs here in workspace mode: follow ${WORKSPACE_GUIDE} as each skill says. Each repository keeps its own hashsmith.json for its own settings. For Hashsmith's work use only the HashOps tools named mcp__plugin_hashsmith_hashops__*, never another connection to the same server.`,
   );
   if (problems.length)
-    parts.push(`This workspace's config does not check out: ${problems.join("; ")}. Every HashOps write asks until it does. Before any other Hashsmith work, run the CLI's check-config here and propose /hashsmith:onboard-project to fix it.`);
+    parts.push(`This workspace's config does not check out: ${problems.join("; ")}. Every HashOps write asks until it does. Before any other Hashsmith work, run the CLI's check-config here and propose /hashsmith:onboard to fix it.`);
   parts.push(`Hashsmith CLI: node "${CLI}" <command> (${CLI_COMMANDS}). Run it from this folder: check-config, repo-match, lists-before-todo, feedback-target, settings (this folder's preferences), config-help (this folder's keys) and git-switch (this folder's own settings, which this session runs under) run as they are; every other command takes --repo <name>, a key of repositories. Run git as git -C <that repository's path>.`);
   const banner = `Hashsmith ${version}${key ? ` · ${key}` : ""} · workspace${problems.length ? " (config does not check out)" : ""}`;
   return finish(parts, banner, version, seenFile);
@@ -112,7 +112,7 @@ export function evaluate(event, { seenFile = SEEN } = {}) {
           : " A hashsmith.json here has no repositories: onboarding cannot run until the developer moves it aside (it does not make this folder onboarded).";
       const parts = [
         read("reference/conduct.md").trim(),
-        `This folder is not a Git repository and has no workspace hashsmith.json.${stray} Git repositories here: ${repos.join(", ")}. Only /hashsmith:onboard-project runs here: it onboards them as one workspace (${WORKSPACE_GUIDE}, "Onboarding"), or explains the per-repository workflow (README "One product, several repositories"). For any other /hashsmith:* skill, propose onboarding first, or starting Claude Code in a repository's own folder. Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
+        `This folder is not a Git repository and has no workspace hashsmith.json.${stray} Git repositories here: ${repos.join(", ")}. Only /hashsmith:onboard runs here: it onboards them as one workspace (${WORKSPACE_GUIDE}, "Onboarding"), or explains the per-repository workflow (README "One product, several repositories"). For any other /hashsmith:* skill, propose onboarding first, or starting Claude Code in a repository's own folder. Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
         `Hashsmith CLI: node "${CLI}" <command> (${CLI_COMMANDS}). Run it from this folder with --repo <folder>, a repository listed above; feedback-target, git-switch (this folder's own settings, which this session runs under) and, once the workspace file is written, check-config need none.`,
       ];
       return finish(parts, `Hashsmith ${version} · workspace not onboarded`, version, seenFile);
@@ -133,12 +133,12 @@ export function evaluate(event, { seenFile = SEEN } = {}) {
   const misplaced = found !== null && typeof found === "object" && "repositories" in found;
   const config = misplaced ? null : found;
   if (misplaced)
-    parts.push(`hashsmith.json at ${root} is a workspace file, but ${root} is a Git repository: a workspace root must be a plain folder holding repositories. Hashsmith treats this repository as not onboarded and every HashOps write asks; run the CLI's check-config and propose /hashsmith:onboard-project.`);
+    parts.push(`hashsmith.json at ${root} is a workspace file, but ${root} is a Git repository: a workspace root must be a plain folder holding repositories. Hashsmith treats this repository as not onboarded and every HashOps write asks; run the CLI's check-config and propose /hashsmith:onboard.`);
   const key = config?.hashops?.project_key;
   parts.push(
     config?.hashops?.project_id
       ? `This project is onboarded: hashsmith.json at ${root} (HashOps project ${key ?? config.hashops.project_id}). For Hashsmith's work use only the HashOps tools named mcp__plugin_hashsmith_hashops__*, never another connection to the same server (for example one named "peoplemuster"). The developer's own HashOps tasks (Daily Recaps, to-dos, leave) are not Hashsmith's work: its connection denies them, and the developer does them in the HashOps app or through their own connection, which asks before each write.`
-      : `This project is not onboarded yet (no HashOps project in ${join(root, "hashsmith.json")}). When the developer wants Hashsmith work, propose /hashsmith:onboard-project first (/hashsmith:feedback works without it). Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
+      : `This project is not onboarded yet (no HashOps project in ${join(root, "hashsmith.json")}). When the developer wants Hashsmith work, propose /hashsmith:onboard first (/hashsmith:feedback works without it). Use only the HashOps tools named mcp__plugin_hashsmith_hashops__*.`,
   );
   parts.push(`Hashsmith CLI: node "${CLI}" <command> (${CLI_COMMANDS}). Run it from the repo root; it prints one JSON line.`);
   return finish(parts, `Hashsmith ${version}${key ? ` · ${key}` : ""}`, version, seenFile);

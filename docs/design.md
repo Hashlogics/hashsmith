@@ -1,7 +1,7 @@
 # Hashsmith — Design
 
 Status: 0.2.0 built 2026-10-28: Phase 0 (manifests, `.mcp.json`, conduct rules, the five hooks)
-plus `onboard-project`, `intake`, the `code-investigator` agent and the Hashsmith CLI
+plus `onboard`, `intake`, the `code-investigator` agent and the Hashsmith CLI
 (`scripts/hashsmith.mjs`). The build plan for 0.2–0.4 (work, sync, design, next, qa) is
 `docs/plans/2026-10-28-hashsmith-0.2-0.4.md`. This document records the decisions and is the input
 for each phase's implementation plan.
@@ -88,7 +88,7 @@ hashsmith/
 │   ├── next/SKILL.md           the one entry point: reads the board, proposes the next step
 │   ├── design/SKILL.md         UI work: project design first, bundled taste rules as fallback
 │   │   └── references/         pinned copy of the MIT taste-skill files (SOURCE.md, LICENSE)
-│   ├── onboard-project/SKILL.md
+│   ├── onboard/SKILL.md
 │   ├── intake/SKILL.md
 │   ├── work/SKILL.md
 │   ├── sync/SKILL.md
@@ -134,7 +134,7 @@ and JSON parsing must be robust.
    a release is announced.
 2. `/mcp`: sign in to HashOps (OAuth, acting as yourself). SonarQube and Sentry are optional and
    your own installs (below).
-3. In a project folder: `claude`, then `/hashsmith:onboard-project`.
+3. In a project folder: `claude`, then `/hashsmith:onboard`.
 
 ### MCP servers (`.mcp.json`)
 
@@ -322,10 +322,12 @@ depend on them.
 
 Teammates found Hashsmith slow: one ticket from `next` to handoff stopped for the developer 7 to
 9 times. `preferences.questions` sets how often it asks: `normal` (the default; `""` or missing
-means normal) or `detailed`. Preferences are a choice, not a cache: never looked up, never asked
-at onboarding. A developer overrides the team's value for themselves, key by key, in
-`~/.hashsmith/settings.json` (`{"preferences": {…}}`), beside handoffs and pins and outside every
-repo; Hashsmith never writes it. The CLI's `settings` prints each effective value and its
+means normal) or `detailed`. Preferences are a choice, not a cache: never looked up. A developer
+overrides the team's value for themselves, key by key, in `~/.hashsmith/settings.json`
+(`{"preferences": {…}}`), beside handoffs and pins and outside every repo. Reversed 2026-11-20
+(HSM-39): onboarding now asks preferences too, "just for you, or for the team?", and writes the
+personal file in that one case, after a yes, merging into the preferences already there and never
+replacing a file it cannot read; nothing else of Hashsmith's writes it. The CLI's `settings` prints each effective value and its
 source (`personal`, `team`, `default`); an invalid value is ignored and named, so a broken file
 never stops a skill. A workspace root may hold the key too; `settings` there reads the root file,
 and with `--repo` a repository's own. Per-project personal values are not supported (not needed
@@ -403,10 +405,25 @@ contains secret-shaped content:
 Each `SKILL.md` stays under 250 lines; depth lives in `reference/`. Each has a trigger-style
 description, fixed checkpoints, and a final step that offers to capture lessons (§12).
 
-### `onboard-project`
+### `onboard`
 
-**Use when:** the session starts in a repo with no `hashsmith.json`, or the developer asks to set
-Hashsmith up for a project.
+**Use when:** the session starts in a repo with no `hashsmith.json`, the developer asks to set
+Hashsmith up for a project or to change a setting, or stored ids are stale.
+
+**Review and edit (decided 2026-11-20, HSM-39).** Named `onboard-project` until 0.12.0 (a stub of
+that name redirects for one release). A first onboarding asks every setting, section by section,
+each with a recommended answer; at the `normal` level the recommendations are taken and listed
+under Assumed. Run on an onboarded repo, it is a review: the HashOps ids are checked without a
+question and looked up only when missing or stale, every setting is shown in one table, and one
+question, "Change any?", picks the sections to ask again, the current value recommended. Nobody
+learns the keys from `config` to edit the file by hand. The flow comes from the key table: each
+row's `onboard` says whether it is looked up in HashOps, detected in the repository (how:
+`reference/config.md`'s lookup table), asked, or kept, so a new key needs no wording in the skill.
+Before anything is written the CLI checks the proposed content (`check-config --stdin`, or
+`--personal --stdin` for the developer's own file) and prints its changes as `key: old → new`;
+content that fails is never written, and one yes writes every file. At a workspace root each file
+is checked on its own before the write; the cross-file check (one `hashops` block) runs after it.
+The steps of a first onboarding:
 
 1. Check the session scope: a single git repo at the session root, or a folder holding
    repositories, which is onboarded as one workspace (`reference/workspace.md`, 0.8.0).
@@ -452,7 +469,8 @@ Hashsmith up for a project.
    - one seeded test user per role exists;
    - the local mail catcher is reachable;
    - each MCP is signed in.
-8. Write `hashsmith.json` after a yes, and list what the developer must still do.
+8. Check the proposed `hashsmith.json` with the CLI, show its changes, write it after a yes, and
+   list what the developer must still do.
 
 If the project has no `CLAUDE.md`, offer to draft one from the code as it actually is. Do not
 draft it from Appendix A: a draft describes the project, it does not restructure it.
@@ -701,13 +719,13 @@ A tool to complete a report would be a hashops PR first.
 ### `config`
 
 **Use when:** the developer asks which `hashsmith.json` settings exist, what this project uses or
-how to set their own (HSM-30). Read-only, by decision: it changes nothing, and points to editing
-`hashsmith.json` (team values), the personal file (preferences) or `onboard-project` (ids).
+how to set their own (HSM-30). Read-only, by decision: it changes nothing, and points to
+`/hashsmith:onboard` to change a value (team or personal; HSM-39), or to editing the files.
 
 It runs the CLI's `config-help` and shows one table per section: key, this project's value, its
 source (`team`, `personal`, `default`, `unset`), allowed values, default and what the key does;
 then the learned keys with their why, how to set a personal value, and the schema command for
-editors. When an essential key (`version`, `hashops.*`) is missing or the file is invalid, it proposes `onboard-project`. It
+editors. When an essential key (`version`, `hashops.*`) is missing or the file is invalid, it proposes `onboard`. It
 works in any repository, onboarded or not, and at a workspace root on the root's file.
 
 ## 7. Ticket template
@@ -800,7 +818,7 @@ A project's own `deny` rules still win over the plugin.
 **Project settings change.** `.claude/settings.json` in hashops, and in projects generated by the
 starter-kit, denies `git switch *`. That deny beats the plugin's ask. Each project moves
 `Bash(git switch *)` from `deny` to `ask` and keeps `git checkout *` denied. In hashops, the Team
-Workflow line in `CLAUDE.md` changes to match. `onboard-project` detects the deny and proposes
+Workflow line in `CLAUDE.md` changes to match. `onboard` detects the deny and proposes
 the edit.
 
 ## 10. Confidentiality and scope
@@ -1084,11 +1102,11 @@ mirrors the app's form and RLS; edits and deletes stay in the app.
 | Phase | Scope | Done when |
 | --- | --- | --- |
 | 0 | Repo skeleton, marketplace and plugin manifests, `conduct.md`, the four guard hooks, `.mcp.json`, README | Plugin installs; the hooks block a commit and a `.env` read and ask on a cross-project call |
-| 1 | `onboard-project`, `intake` on hashops | Two weeks of real requirements become tickets the team accepts without heavy rewriting |
+| 1 | `onboard`, `intake` on hashops | Two weeks of real requirements become tickets the team accepts without heavy rewriting |
 | 2 | `work`, `sync` (with correction capture) | Ten tickets taken from To Do to Done through PRs |
 | 3 | `feedback`, the Hashsmith board, `release`, manual golden scenarios | First release built from team feedback |
 | 4 | `qa`, `triage` | QA runs on real tickets; one production bug triaged end to end |
-| 5 | A second project via `onboard-project`; automated evals | Hashsmith works in a project it was not built in |
+| 5 | A second project via `onboard`; automated evals | Hashsmith works in a project it was not built in |
 
 Releases so far: 0.2.0 shipped phase 1, 0.3.0 phase 2 plus `next` and `design`, 0.4.0 `qa`
 from phase 4, and 0.5.0 `feedback` and the Hashsmith board from phase 3. `release` and `triage`

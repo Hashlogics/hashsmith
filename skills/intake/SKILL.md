@@ -15,7 +15,7 @@ session context. At a workspace root (session start says so), also follow `refer
 
 ## 1. Preconditions
 
-1. Run the CLI's `check-config`. Not ok, or no `hashsmith.json`: propose `/hashsmith:onboard-project`
+1. Run the CLI's `check-config`. Not ok, or no `hashsmith.json`: propose `/hashsmith:onboard`
    and stop. Read `hashops.project_id`, `hashops.board_id`, `hashops.lists.todo`, `hashops.ai_tag`
    and `intake.processed_meetings` from the file; never ask for them. Read the question level
    from the CLI's `settings` (`questions.value`; conduct 3).

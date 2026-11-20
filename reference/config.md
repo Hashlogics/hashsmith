@@ -53,6 +53,13 @@ learned entry, and names the key it most likely meant (`Unknown key "repo.branch
 mean "repo.branch_policy"?`). A file that is not JSON is reported with its line and column, or
 the lines of its merge-conflict markers.
 
+Nobody needs to edit the file by hand: `/hashsmith:onboard` asks every setting on a first run and,
+on a later one, shows them all and asks again only the sections the developer picks. Each row's
+`onboard` says how it gets the value: `lookup` (HashOps, checked without a question), `detect` (the
+table at the end of this file says how; the found value is the recommendation), `ask` (its
+default recommended) or `keep` (never asked). It checks the proposed file first
+(`check-config --stdin`, which prints each change as `key: old → new`) and writes after one yes.
+
 ## Core keys
 
 The keys above `learned` are **core**. They are defined in `reference/config.md`, and the skills
@@ -71,10 +78,12 @@ depend on them.
 
 ## Preferences
 
-How the team works with Hashsmith, not a cache: never looked up, never asked at onboarding.
+How the team works with Hashsmith, not a cache: never looked up; `/hashsmith:onboard` asks them.
 `""` or missing means the default. A developer overrides it for themselves, key by key, in
-`~/.hashsmith/settings.json` (`{"preferences": {"questions": "detailed"}}`), outside every repo;
-Hashsmith never writes that file. The CLI's `settings` prints each effective value and its source
+`~/.hashsmith/settings.json` (`{"preferences": {"questions": "detailed"}}`), outside every repo.
+Hashsmith writes that file only when onboarding's answer is "just for you", after a yes, keeping
+the other preferences there and never replacing a file it cannot read (`check-config --personal
+--stdin` refuses). The CLI's `settings` prints each effective value and its source
 (`personal`, `team` or `default`); an invalid value is ignored and named in its `errors`.
 
 - **`questions`:** `normal` (default) or `detailed`. `normal`: a question with a recommended
@@ -134,14 +143,14 @@ JWTs, `sk_`, `ghp_`, `xox[abp]-` and `-----BEGIN` patterns; learned key names co
 | `hashops.board_id` | the stored id while `get_board` finds it active in the project; else `list_boards {project_id, status: "active"}`: one → use it, several → ask |
 | `hashops.lists.*` | `get_board` list names, case-insensitive: To Do / Todo, In Progress, Review, QA, Done |
 | `hashops.ai_tag` | `hashsmith`, created with `create_project_tag` when `list_project_tags` lacks it, or by a project lead when the session lacks that tool |
-| `repo.base_branch` | the PR target in the project's CLAUDE.md, else `git rev-parse --abbrev-ref origin/HEAD` |
+| `repo.base_branch` | the PR target in the project's CLAUDE.md, else `git rev-parse --abbrev-ref origin/HEAD`; asked when that fails or the two disagree |
 | `repo.branch_policy` | asked once: `managed` (default; `""` or missing means managed), `current` or `confirm` |
-| `qa.base_url` | `http://localhost:<port>` from the dev script or dev-server config |
+| `qa.base_url` | `http://localhost:<port>` from the dev script in `package.json` or the dev-server config (for example the Vite `server.port`); asked when neither names a port; `""` with `qa.mode` `code` |
 | `qa.mode` | `code` when the project has no web UI (no dev server, nothing to open in a browser; `base_url` stays `""`), else `browser`; asked when unclear |
-| `sonar.project_key` | `sonar-project.properties`, else `hashlogics_<repo>` |
+| `sonar.project_key` | `sonar.projectKey` in `sonar-project.properties`, else `hashlogics_<repo folder name>` |
 | `sentry.project` | the Sentry tools' project list, only when the session has them |
-| `preferences.*` | never looked up: the team's choice; a developer's own in `~/.hashsmith/settings.json` |
-| `changelog.mode`, `path` | the CLI's `changelog`: a tool that builds it from commits → `commits`; else a root `CHANGELOG.md` / `CHANGES.md` / `HISTORY.md` → `write`; else one question, where anything but a clear no is `write` (`reference/changelog.md`). A stored `write` turns stale once a generator appears; `off` always stands |
+| `preferences.*` | never looked up: asked at onboarding, for the team or just for the developer (`~/.hashsmith/settings.json`) |
+| `changelog.mode`, `path` | the CLI's `changelog`: a tool that builds it from commits → `commits`; else a root `CHANGELOG.md` / `CHANGES.md` / `HISTORY.md` → `write`; else one question, recommending `write`, where anything but a clear no is `write` (`reference/changelog.md`). A stored `write` turns stale once a generator appears; `off` always stands |
 
 ## Migrating `ai_tag` to `hashsmith`
 

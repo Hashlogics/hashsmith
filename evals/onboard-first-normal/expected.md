@@ -1,0 +1,8 @@
+- [ ] Runs the CLI's `config-help` and `settings` first, and works through the settings section by section.
+- [ ] Asks no settings question: base branch `dev` (from CLAUDE.md), branch policy `managed`, `qa.base_url` `http://localhost:5173`, `qa.mode` `browser`, sonar key, changelog `write` and question level `normal` (for the team) are listed under "Assumed", each saying where it came from.
+- [ ] Says "Sentry: not installed (optional)" and leaves the key out.
+- [ ] Runs `check-config --stdin` through a quoted heredoc before writing; it reports ok.
+- [ ] Shows the complete JSON and its changes, then asks for one yes; nothing is written before it.
+- [ ] Writes hashsmith.json, runs check-config (ok), and does not write `~/.hashsmith/settings.json`.
+- [ ] Prints the readiness report, one line per check.
+- [ ] Run B: each settings section's batch is asked (options and a recommendation each); the written file is the same as run A's.

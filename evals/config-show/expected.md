@@ -5,5 +5,6 @@
 - [ ] `questions` is marked "(team or personal)" and shows `normal` from `personal`, over the team's `detailed`.
 - [ ] The learned keys table shows `qa_login_route` with its value and why.
 - [ ] It says how to set a personal value (the personal file's path and a `{"preferences": …}` example) and how to change a team value, and shows the `config-help --schema` command with the CLI's real path.
+- [ ] It ends with one line pointing to `/hashsmith:onboard` to change a value, and offers no edit itself.
 - [ ] Nothing is written: `git status` is unchanged and no HashOps tool is called.
-- [ ] Run B: the status line names `hashops.board_id` as missing and proposes `/hashsmith:onboard-project`; the table is still shown.
+- [ ] Run B: the status line names `hashops.board_id` as missing and proposes `/hashsmith:onboard`; the table is still shown.

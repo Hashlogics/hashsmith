@@ -113,7 +113,7 @@ describe("skills and agents", () => {
     assert.match(handoff, /`Changelog:` line/, "§7 must carry the Changelog line");
     const template = readFileSync(join(root, "reference", "handoff-template.md"), "utf8");
     assert.match(template, /^Changelog: added under Unreleased — "/m, "the handoff template needs the Changelog line");
-    assert.match(readFileSync(join(root, "skills", "onboard-project", "SKILL.md"), "utf8"), /CLI's `changelog`/);
+    assert.match(readFileSync(join(root, "skills", "onboard", "SKILL.md"), "utf8"), /CLI's `changelog`/);
   });
   it("Hashsmith never touches a project's versions or releases", () => {
     const text = readFileSync(join(root, "reference", "changelog.md"), "utf8");

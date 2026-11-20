@@ -13,7 +13,7 @@ At a workspace root (session start says so), also follow `reference/workspace.md
 ## 1. Onboarded?
 
 Run the CLI's `check-config` (the `Hashsmith CLI` line in your session context). No
-`hashsmith.json`, or invalid: say so in one line and propose `/hashsmith:onboard-project`. Stop
+`hashsmith.json`, or invalid: say so in one line and propose `/hashsmith:onboard`. Stop
 there.
 
 ## 2. Sync
@@ -27,7 +27,7 @@ Icebox, Ideas). Pass `get_board`'s `lists` to the CLI's `lists-before-todo` as J
 through a quoted heredoc so no name is on the command line: `node "<cli>" lists-before-todo
 <<'EOF'` / `[{"id": …, "name": …, "type": …}, …]` / `EOF`. It prints the active ones that come
 before To Do and are not in `hashops.lists`. An `error` that To Do is not on this board means
-stale ids: say so and propose `/hashsmith:onboard-project`; any other `error` means the input was
+stale ids: say so and propose `/hashsmith:onboard`; any other `error` means the input was
 wrong: run it again with `get_board`'s `lists`.
 
 `list_tasks` with `{board_id, status: <list name>, limit: 60}` for those lists and for To Do, In

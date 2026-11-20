@@ -94,7 +94,7 @@ export function evaluate(event, config = scopeConfig(projectDir(event)), feedbac
     if (isRead(tool)) return null;
     if (workspace)
       return decide("ask", `\`${tool}\` writes to HashOps, and this workspace's hashsmith.json does not check out (${problems.slice(0, 3).join("; ")}), so Hashsmith's checks do not cover it. Run the CLI's check-config at the workspace root and fix it, or confirm this one write.`);
-    return decide("ask", `\`${tool}\` writes to HashOps, and this project has no HashOps project in hashsmith.json yet. Run /hashsmith:onboard-project first, or confirm this one write.`);
+    return decide("ask", `\`${tool}\` writes to HashOps, and this project has no HashOps project in hashsmith.json yet. Run /hashsmith:onboard first, or confirm this one write.`);
   }
 
   const mismatches = [];

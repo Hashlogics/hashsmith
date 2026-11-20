@@ -3,4 +3,4 @@ The developer sees 40 HashOps projects. Two are named like the repo: "Acme Web" 
 repository link is https://github.com/acmeco/acme-web, and "Acme" (key ACM), with no links.
 The other 38 have unrelated names; one of them, "Beta" (key BETA), has a link to
 https://github.com/acmeco/beta.
-Developer types: /hashsmith:onboard-project
+Developer types: /hashsmith:onboard

@@ -27,14 +27,20 @@ const LISTS = [
  *  - scope: team (hashsmith.json), or personal (~/.hashsmith/settings.json may override the team's).
  *  - files: the hashsmith.json files that may hold it (a repository's, a workspace root's).
  *  - names: for a `<name>` segment, the pattern each name follows.
- *  - schema: its JSON Schema, when `values` is a phrase. */
+ *  - schema: its JSON Schema, when `values` is a phrase.
+ *  - onboard: how /hashsmith:onboard gets it (HSM-39), one of ONBOARD_WAYS: `lookup` (HashOps,
+ *    checked without a question and looked up only when missing or stale), `detect` (found in the
+ *    repository as reference/config.md's lookup table says; the found value is the recommendation),
+ *    `ask` (asked, the default recommended) or `keep` (never asked: written by Hashsmith itself). */
+export const ONBOARD_WAYS = ["lookup", "detect", "ask", "keep"];
 export const CONFIG_KEYS = [
-  { key: "version", values: [1], default: null, unset: "written at onboarding", essential: true, required: true, scope: "team", files: BOTH, about: "Config shape version; Hashsmith migrates older shapes on read." },
-  { key: "hashops.project_id", values: "a UUID", default: null, unset: "looked up: the HashOps project linked to this repository, else your pick", essential: true, required: true, scope: "team", files: BOTH, about: "The HashOps project this repository's tickets live in.", schema: { type: "string", pattern: `^${UUID}$` } },
-  { key: "hashops.project_key", values: "upper-case letters and digits", default: null, unset: "looked up with the project", essential: true, required: true, scope: "team", files: BOTH, about: "The task-code prefix (ACME-12); the scope hook checks every task code against it.", schema: { type: "string", pattern: "^[A-Z0-9]+$" } },
-  { key: "hashops.board_id", values: "a UUID", default: null, unset: "looked up: the project's one active board, else asked", essential: true, required: true, scope: "team", files: BOTH, about: "The board Hashsmith reads and moves tickets on.", schema: { type: "string", pattern: `^${UUID}$` } },
+  { key: "version", onboard: "keep", values: [1], default: null, unset: "written at onboarding", essential: true, required: true, scope: "team", files: BOTH, about: "Config shape version; Hashsmith migrates older shapes on read." },
+  { key: "hashops.project_id", onboard: "lookup", values: "a UUID", default: null, unset: "looked up: the HashOps project linked to this repository, else your pick", essential: true, required: true, scope: "team", files: BOTH, about: "The HashOps project this repository's tickets live in.", schema: { type: "string", pattern: `^${UUID}$` } },
+  { key: "hashops.project_key", onboard: "lookup", values: "upper-case letters and digits", default: null, unset: "looked up with the project", essential: true, required: true, scope: "team", files: BOTH, about: "The task-code prefix (ACME-12); the scope hook checks every task code against it.", schema: { type: "string", pattern: "^[A-Z0-9]+$" } },
+  { key: "hashops.board_id", onboard: "lookup", values: "a UUID", default: null, unset: "looked up: the project's one active board, else asked", essential: true, required: true, scope: "team", files: BOTH, about: "The board Hashsmith reads and moves tickets on.", schema: { type: "string", pattern: `^${UUID}$` } },
   ...LISTS.map(([k, name]) => ({
     key: `hashops.lists.${k}`,
+    onboard: "lookup",
     values: 'a UUID, or ""',
     empty: true,
     default: null,
@@ -46,17 +52,18 @@ export const CONFIG_KEYS = [
     about: `The board's ${name} list.`,
     schema: { type: "string", pattern: `^$|^${UUID}$` },
   })),
-  { key: "hashops.ai_tag", values: "a tag name", default: null, unset: "written at onboarding: hashsmith", essential: true, required: true, scope: "team", files: BOTH, about: "The tag on every ticket Hashsmith works; sync and qa follow only tagged tickets.", schema: { type: "string", pattern: "\\S" } },
-  { key: "repo.base_branch", values: "a branch name", default: null, unset: "looked up: the PR target in the project's CLAUDE.md, else origin/HEAD", required: true, scope: "team", files: REPO, about: "What ai/* branches are cut from and PRs target.", schema: { type: "string", pattern: "\\S" } },
-  { key: "repo.branch_policy", values: ["managed", "current", "confirm"], empty: true, default: "managed", scope: "team", files: REPO, about: "How work and qa pick a branch: a new ai/* branch, the checked-out one, or ask before each switch." },
-  { key: "qa.base_url", values: "http://localhost:<port> or http://127.0.0.1:<port>", empty: true, default: null, unset: "looked up from the dev script, else asked", required: true, scope: "team", files: REPO, about: "The local app QA and design screenshots open; never a hosted one.", schema: { type: "string", pattern: "^$|^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/\\S*)?$" } },
-  { key: "qa.mode", values: ["browser", "code"], empty: true, default: null, unset: "asked when qa starts", scope: "team", files: REPO, about: "How qa verifies: in the browser, or by code and tests for a project with no web UI." },
-  { key: "sonar.project_key", values: "a SonarQube project key", empty: true, default: null, unset: "looked up from sonar-project.properties, else hashlogics_<repo>", required: true, scope: "team", files: REPO, about: "The Sonar project self-review reads issues from, when Sonar tools are present.", schema: { type: "string" } },
-  { key: "sentry.project", values: "a Sentry project", empty: true, default: null, unset: "looked up from the Sentry tools, when the session has them", required: true, scope: "team", files: REPO, about: "The Sentry project for issue details.", schema: { type: "string" } },
-  { key: "changelog.mode", values: ["write", "commits", "off"], default: null, unset: "detected by the CLI's changelog, else asked once", required: true, scope: "team", files: REPO, about: "How the changelog is kept: Hashsmith writes entries, a tool builds it from commits, or off." },
-  { key: "changelog.path", values: "a .md file at the repository root", default: null, unset: "detected with the mode", required: true, scope: "team", files: REPO, about: "The changelog file Hashsmith writes entries to in write mode.", schema: { type: "string", pattern: "^[^/\\\\]+\\.[mM][dD]$" } },
+  { key: "hashops.ai_tag", onboard: "lookup", values: "a tag name", default: null, unset: "written at onboarding: hashsmith", essential: true, required: true, scope: "team", files: BOTH, about: "The tag on every ticket Hashsmith works; sync and qa follow only tagged tickets.", schema: { type: "string", pattern: "\\S" } },
+  { key: "repo.base_branch", onboard: "detect", values: "a branch name", default: null, unset: "looked up: the PR target in the project's CLAUDE.md, else origin/HEAD", required: true, scope: "team", files: REPO, about: "What ai/* branches are cut from and PRs target.", schema: { type: "string", pattern: "\\S" } },
+  { key: "repo.branch_policy", onboard: "ask", values: ["managed", "current", "confirm"], empty: true, default: "managed", scope: "team", files: REPO, about: "How work and qa pick a branch: a new ai/* branch, the checked-out one, or ask before each switch." },
+  { key: "qa.base_url", onboard: "detect", values: "http://localhost:<port> or http://127.0.0.1:<port>", empty: true, default: null, unset: "looked up from the dev script, else asked", required: true, scope: "team", files: REPO, about: "The local app QA and design screenshots open; never a hosted one.", schema: { type: "string", pattern: "^$|^https?://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/\\S*)?$" } },
+  { key: "qa.mode", onboard: "detect", values: ["browser", "code"], empty: true, default: null, unset: "asked when qa starts", scope: "team", files: REPO, about: "How qa verifies: in the browser, or by code and tests for a project with no web UI." },
+  { key: "sonar.project_key", onboard: "detect", values: "a SonarQube project key", empty: true, default: null, unset: "looked up from sonar-project.properties, else hashlogics_<repo>", required: true, scope: "team", files: REPO, about: "The Sonar project self-review reads issues from, when Sonar tools are present.", schema: { type: "string" } },
+  { key: "sentry.project", onboard: "detect", values: "a Sentry project", empty: true, default: null, unset: "looked up from the Sentry tools, when the session has them", required: true, scope: "team", files: REPO, about: "The Sentry project for issue details.", schema: { type: "string" } },
+  { key: "changelog.mode", onboard: "detect", values: ["write", "commits", "off"], default: null, unset: "detected by the CLI's changelog, else asked once", required: true, scope: "team", files: REPO, about: "How the changelog is kept: Hashsmith writes entries, a tool builds it from commits, or off." },
+  { key: "changelog.path", onboard: "detect", values: "a .md file at the repository root", default: null, unset: "detected with the mode", required: true, scope: "team", files: REPO, about: "The changelog file Hashsmith writes entries to in write mode.", schema: { type: "string", pattern: "^[^/\\\\]+\\.[mM][dD]$" } },
   {
     key: "intake.processed_meetings",
+    onboard: "keep",
     values: '[{id, on: YYYY-MM-DD, tickets: ["KEY-12"], note?}]',
     default: [],
     scope: "team",
@@ -77,10 +84,11 @@ export const CONFIG_KEYS = [
       },
     },
   },
-  { key: "preferences.questions", values: ["normal", "detailed"], empty: true, default: "normal", scope: "personal", files: BOTH, about: "How much Hashsmith asks: normal takes recommended answers and lists them under Assumed; detailed asks every question batch." },
-  { key: "repositories.<name>.path", values: "a relative folder inside the workspace", names: REPO_NAME, default: null, unset: "written when the workspace is onboarded", required: true, scope: "team", files: ["workspace"], about: "Each repository of the workspace and its folder; its settings live in its own hashsmith.json.", schema: { type: "string", minLength: 1 } },
+  { key: "preferences.questions", onboard: "ask", values: ["normal", "detailed"], empty: true, default: "normal", scope: "personal", files: BOTH, about: "How much Hashsmith asks: normal takes recommended answers and lists them under Assumed; detailed asks every question batch." },
+  { key: "repositories.<name>.path", onboard: "keep", values: "a relative folder inside the workspace", names: REPO_NAME, default: null, unset: "written when the workspace is onboarded", required: true, scope: "team", files: ["workspace"], about: "Each repository of the workspace and its folder; its settings live in its own hashsmith.json.", schema: { type: "string", minLength: 1 } },
   {
     key: "learned.<name>",
+    onboard: "keep",
     values: "{value, why, source, added: YYYY-MM-DD}",
     names: /^[a-z][a-z0-9_]*$/,
     default: null,

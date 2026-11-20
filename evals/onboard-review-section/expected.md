@@ -1,0 +1,6 @@
+- [ ] Checks the HashOps ids with `get_board` and asks nothing about them.
+- [ ] Shows one table of every setting with its value and source; ids shortened.
+- [ ] Asks "Change any?" with the sections as choices and None as the default.
+- [ ] Asks only the repo section's settings, each recommending its current value (`main`, `managed`); no qa, changelog or preferences question.
+- [ ] `check-config --stdin` reports ok and the shown changes are exactly `repo.branch_policy: "managed" → "current"`.
+- [ ] After the yes only that value differs in hashsmith.json; check-config reports ok; it says the file is unstaged.

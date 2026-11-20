@@ -149,9 +149,12 @@ Keep this list current: add what you defer, remove what you finish.
   Completed); a project-scoped tool to set items and complete the report would be a hashops PR,
   and could then replace the session pins in `hooks/health-pin.mjs`.
 - [ ] **Question level (HSM-28, 0.10.0):** run `work-questions-normal` and
-  `work-questions-detailed` live. `next`'s menu and `onboard-project` do not read the level yet;
+  `work-questions-detailed` live. `next`'s menu does not read the level yet;
   `work-brief`, `work-assessment-concern` and `intake-basic` now pin `detailed`.
 - [ ] **Settings table (HSM-30, 0.11.0):** run `config-show` live. `next`'s menu does not offer
-  `/hashsmith:config`; onboarding could show its table at the end instead of its own summary.
+  `/hashsmith:config`.
+- [ ] **Onboard review (HSM-39, 0.12.0):** run `onboard-first-normal`, `onboard-review-section`,
+  `onboard-review-none`, `onboard-personal-level` and the updated `onboard-rerun` live. Remove
+  the `skills/onboard-project` stub (it only redirects to `onboard`) in 0.13.0.
 - [ ] **Not built yet:** `triage` skill, the `release` step, automated evals (design §13 phase 2,
   §15).
